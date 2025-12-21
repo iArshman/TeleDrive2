@@ -1,0 +1,82 @@
+/* Drive Page Styles */
+
+.drive-page {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.drive-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--bg-primary);
+}
+
+.drive-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.drive-main.with-preview .drive-content {
+    gap: 0;
+}
+
+/* Loading State */
+.loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: var(--spacing-lg);
+    color: var(--text-secondary);
+}
+
+.loading-container .spinner {
+    width: 40px;
+    height: 40px;
+}
+
+/* Error State */
+.error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: var(--spacing-lg);
+    text-align: center;
+}
+
+.error-message {
+    color: var(--error);
+    font-size: 16px;
+}
+
+/* New Folder Modal */
+.new-folder-modal {
+    width: 360px;
+    padding: var(--spacing-xl);
+}
+
+.new-folder-modal h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: var(--spacing-lg);
+}
+
+.new-folder-modal input {
+    width: 100%;
+    padding: var(--spacing-md);
+    font-size: 14px;
+    margin-bottom: var(--spacing-lg);
+}
+
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--spacing-sm);
+}
