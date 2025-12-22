@@ -97,12 +97,10 @@
 .thumbnail-skeleton {
     width: 100%;
     height: 100%;
-    background: linear-gradient(
-        90deg,
-        var(--bg-secondary) 0%,
-        var(--bg-tertiary) 50%,
-        var(--bg-secondary) 100%
-    );
+    background: linear-gradient(90deg,
+            var(--bg-secondary) 0%,
+            var(--bg-tertiary) 50%,
+            var(--bg-secondary) 100%);
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s infinite;
 }
@@ -111,6 +109,7 @@
     0% {
         background-position: 200% 0;
     }
+
     100% {
         background-position: -200% 0;
     }
@@ -268,4 +267,105 @@
 /* Context Menu Positioning */
 .context-menu {
     position: fixed;
+}
+
+/* ============================================
+   MOBILE FILE GRID STYLES
+   ============================================ */
+
+@media (max-width: 768px) {
+    .file-container {
+        padding: var(--spacing-md);
+    }
+
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: var(--spacing-md);
+    }
+
+    .file-item {
+        padding: var(--spacing-sm);
+    }
+
+    .file-icon,
+    .file-thumbnail {
+        width: 60px;
+        height: 60px;
+    }
+
+    .file-name {
+        font-size: 12px;
+        max-width: 100px;
+    }
+
+    /* List view - hide date and type columns on tablet */
+    .list-header,
+    .file-list-item {
+        grid-template-columns: 1fr 80px;
+    }
+
+    .list-date,
+    .list-type {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .file-container {
+        padding: var(--spacing-sm);
+    }
+
+    .file-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: var(--spacing-sm);
+    }
+
+    .file-item {
+        padding: var(--spacing-xs);
+    }
+
+    .file-icon,
+    .file-thumbnail {
+        width: 52px;
+        height: 52px;
+    }
+
+    .file-name {
+        font-size: 11px;
+        max-width: 80px;
+    }
+
+    .file-size {
+        font-size: 10px;
+    }
+
+    .empty-icon {
+        font-size: 48px;
+    }
+
+    .empty-folder h3 {
+        font-size: 16px;
+    }
+
+    .empty-folder p {
+        font-size: 13px;
+    }
+
+    /* List view - show only name on mobile */
+    .list-header,
+    .file-list-item {
+        grid-template-columns: 1fr;
+    }
+
+    .list-header {
+        display: none;
+    }
+
+    .list-size {
+        display: none;
+    }
+
+    .file-list-item {
+        padding: var(--spacing-md);
+    }
 }

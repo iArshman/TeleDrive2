@@ -80,3 +80,39 @@
     justify-content: flex-end;
     gap: var(--spacing-sm);
 }
+
+/* ============================================
+   MOBILE DRIVE PAGE STYLES
+   ============================================ */
+
+@media (max-width: 768px) {
+    .drive-page {
+        flex-direction: column;
+    }
+
+    .drive-main {
+        width: 100%;
+    }
+
+    .new-folder-modal {
+        width: 90%;
+        max-width: 320px;
+    }
+}
+
+@media (max-width: 480px) {
+    .new-folder-modal {
+        width: 100%;
+        max-width: none;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .new-folder-modal h2 {
+        font-size: 16px;
+    }
+
+    .new-folder-modal input {
+        font-size: 16px;
+        padding: var(--spacing-md);
+    }
+}

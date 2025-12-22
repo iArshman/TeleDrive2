@@ -166,3 +166,59 @@
 .login-form {
     animation: fadeSlideIn 0.3s ease;
 }
+
+/* ============================================
+   MOBILE LOGIN PAGE STYLES
+   ============================================ */
+
+@media (max-width: 768px) {
+    .login-page {
+        padding: var(--spacing-md);
+    }
+
+    .login-container {
+        padding: var(--spacing-xl);
+    }
+}
+
+@media (max-width: 480px) {
+    .login-page {
+        padding: var(--spacing-sm);
+        align-items: flex-start;
+        padding-top: 15vh;
+    }
+
+    .login-container {
+        max-width: 100%;
+        padding: var(--spacing-lg);
+        border-radius: var(--radius-lg);
+    }
+
+    .login-logo {
+        width: 64px;
+        height: 64px;
+    }
+
+    .login-header h1 {
+        font-size: 24px;
+    }
+
+    .login-subtitle {
+        font-size: 13px;
+    }
+
+    .form-group input {
+        font-size: 16px;
+        padding: var(--spacing-md);
+        min-height: 48px;
+    }
+
+    .login-btn {
+        font-size: 16px;
+        min-height: 52px;
+    }
+
+    .login-footer {
+        font-size: 11px;
+    }
+}

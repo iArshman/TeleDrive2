@@ -239,3 +239,123 @@
     background: var(--bg-selected);
     color: var(--text-on-accent);
 }
+
+/* ============================================
+   MOBILE HEADER STYLES
+   ============================================ */
+
+/* Hamburger Menu Button */
+.menu-toggle {
+    display: none;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+    transition: background var(--transition-fast);
+}
+
+.menu-toggle:hover {
+    background: var(--bg-hover);
+}
+
+.menu-toggle svg {
+    width: 24px;
+    height: 24px;
+}
+
+@media (max-width: 768px) {
+    .main-header {
+        padding: 0 var(--spacing-md);
+        gap: var(--spacing-sm);
+    }
+
+    .menu-toggle {
+        display: flex;
+    }
+
+    .nav-buttons {
+        display: none;
+    }
+
+    .search-box {
+        width: 100%;
+        max-width: 200px;
+    }
+
+    .upload-btn span {
+        display: none;
+    }
+
+    .upload-btn {
+        padding: var(--spacing-sm);
+        width: 44px;
+        height: 44px;
+        justify-content: center;
+    }
+
+    .header-left {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .breadcrumb {
+        font-size: 13px;
+    }
+
+    /* Hide breadcrumb separators except last two items */
+    .breadcrumb-item:not(:nth-last-child(-n+2)) {
+        display: none;
+    }
+
+    .view-toggle {
+        display: none;
+    }
+}
+
+@media (max-width: 480px) {
+    .main-header {
+        padding: 0 var(--spacing-sm);
+    }
+
+    .search-box {
+        display: none;
+    }
+
+    /* Show search icon button instead */
+    .search-toggle {
+        display: flex;
+    }
+
+    .header-logo .logo-text {
+        font-size: 18px;
+    }
+
+    .header-logo .logo-icon {
+        width: 24px;
+        height: 24px;
+    }
+
+    .breadcrumb {
+        font-size: 12px;
+    }
+
+    .breadcrumb-link {
+        padding: var(--spacing-xs);
+    }
+}
+
+/* Search toggle button (hidden by default) */
+.search-toggle {
+    display: none;
+    width: 44px;
+    height: 44px;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-md);
+}
+
+.search-toggle svg {
+    width: 20px;
+    height: 20px;
+}

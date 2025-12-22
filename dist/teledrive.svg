@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="teleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0088cc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#00a8e8;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <circle cx="50" cy="50" r="45" fill="url(#teleGrad)"/>
+  <path d="M30 50 L45 50 L50 35 L55 60 L60 50 L70 50" stroke="white" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M25 65 L75 65" stroke="white" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>
+  <path d="M30 72 L70 72" stroke="white" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.5"/>
+</svg>
