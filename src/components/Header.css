@@ -283,7 +283,7 @@
         max-width: 200px;
     }
 
-    .upload-btn span {
+    .upload-btn span:last-child {
         display: none;
     }
 

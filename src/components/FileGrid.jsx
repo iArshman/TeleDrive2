@@ -311,6 +311,14 @@ function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop })
 
     const handleClick = (e) => {
         if (isEditing) return
+
+        // On touch devices, single tap on folders should open them
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+        if (isTouchDevice && file.type === 'folder') {
+            onOpen(file)
+            return
+        }
+
         onSelect(file.id, e.ctrlKey || e.metaKey)
     }
 
