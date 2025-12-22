@@ -167,3 +167,22 @@
 .drive-main.with-preview .drop-zone-container {
     flex: 1;
 }
+
+/* ============================================
+   MOBILE PREVIEW PANEL STYLES
+   ============================================ */
+
+@media (max-width: 768px) {
+    .preview-panel {
+        display: none;
+    }
+
+    /* On mobile, don't adjust layout for preview */
+    .drive-main.with-preview {
+        display: flex;
+    }
+
+    .drive-main.with-preview .drop-zone-container {
+        flex: 1;
+    }
+}
