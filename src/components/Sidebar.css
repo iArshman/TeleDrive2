@@ -200,6 +200,65 @@
     text-overflow: ellipsis;
 }
 
+/* Folder Action Buttons */
+.folder-actions {
+    display: none;
+    align-items: center;
+    gap: 2px;
+    margin-left: auto;
+}
+
+.folder-item:hover .folder-actions {
+    display: flex;
+}
+
+.folder-action-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    padding: 0;
+}
+
+.folder-action-btn:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.folder-action-btn.danger:hover {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--error);
+}
+
+.folder-action-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Folder Name Input (for inline editing) */
+.folder-name-input {
+    flex: 1;
+    background: var(--bg-primary);
+    border: 1px solid var(--accent-primary);
+    border-radius: var(--radius-sm);
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    min-width: 0;
+}
+
+.folder-name-input:focus {
+    box-shadow: 0 0 0 2px rgba(0, 136, 204, 0.2);
+}
+
 .folder-children {
     margin-left: 0;
 }
@@ -459,5 +518,20 @@
     .menu-item {
         padding: var(--spacing-md) var(--spacing-lg);
         min-height: 48px;
+    }
+
+    /* Always show folder actions on mobile (touch devices) */
+    .folder-actions {
+        display: flex;
+    }
+
+    .folder-action-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .folder-action-btn svg {
+        width: 16px;
+        height: 16px;
     }
 }

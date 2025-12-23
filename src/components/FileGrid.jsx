@@ -275,12 +275,22 @@ const FileIcons = {
     ),
 }
 
-function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop }) {
-    const [isEditing, setIsEditing] = useState(false)
+function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop, isEditing: externalIsEditing, onEditComplete }) {
+    const [isEditingInternal, setIsEditingInternal] = useState(false)
     const [editName, setEditName] = useState(file.name)
     const [isDragOver, setIsDragOver] = useState(false)
     const inputRef = useRef(null)
     const { renameItem, downloadFile } = useFileSystem()
+
+    // Combine internal and external editing state
+    const isEditing = isEditingInternal || externalIsEditing
+
+    // Sync external editing state
+    useEffect(() => {
+        if (externalIsEditing) {
+            setEditName(file.name)
+        }
+    }, [externalIsEditing, file.name])
 
     // Check if file should show thumbnail
     const shouldShowThumbnail = file.fileType === 'image' || file.fileType === 'video'
@@ -296,7 +306,8 @@ function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop })
         if (editName.trim() && editName !== file.name) {
             await renameItem(file.id, editName.trim())
         }
-        setIsEditing(false)
+        setIsEditingInternal(false)
+        onEditComplete?.()
         setEditName(file.name)
     }
 
@@ -304,18 +315,72 @@ function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop })
         if (e.key === 'Enter') {
             handleRename()
         } else if (e.key === 'Escape') {
-            setIsEditing(false)
+            setIsEditingInternal(false)
+            onEditComplete?.()
             setEditName(file.name)
+        }
+    }
+
+    // Long press detection for mobile
+    const longPressTimer = useRef(null)
+    const touchStartPos = useRef({ x: 0, y: 0 })
+    const [isLongPress, setIsLongPress] = useState(false)
+
+    const handleTouchStart = (e) => {
+        if (isEditing) return
+        touchStartPos.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        setIsLongPress(false)
+
+        longPressTimer.current = setTimeout(() => {
+            setIsLongPress(true)
+            // Trigger context menu on long press
+            const touch = e.touches[0]
+            onContextMenu({
+                preventDefault: () => { },
+                clientX: touch.clientX,
+                clientY: touch.clientY
+            }, file)
+        }, 500) // 500ms for long press
+    }
+
+    const handleTouchMove = (e) => {
+        // Cancel long press if finger moves too much
+        const touch = e.touches[0]
+        const dx = Math.abs(touch.clientX - touchStartPos.current.x)
+        const dy = Math.abs(touch.clientY - touchStartPos.current.y)
+        if (dx > 10 || dy > 10) {
+            if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current)
+                longPressTimer.current = null
+            }
+        }
+    }
+
+    const handleTouchEnd = (e) => {
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current)
+            longPressTimer.current = null
+        }
+
+        // If it was a long press, don't trigger click
+        if (isLongPress) {
+            setIsLongPress(false)
+            return
+        }
+
+        // Single tap opens file/folder on touch devices
+        if (!isEditing) {
+            onOpen(file)
         }
     }
 
     const handleClick = (e) => {
         if (isEditing) return
 
-        // On touch devices, single tap on folders should open them
+        // On touch devices, use touch handlers instead
         const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-        if (isTouchDevice && file.type === 'folder') {
-            onOpen(file)
+        if (isTouchDevice) {
+            // Touch events handle this
             return
         }
 
@@ -375,6 +440,9 @@ function FileItem({ file, isSelected, onSelect, onOpen, onContextMenu, onDrop })
             onClick={handleClick}
             onDoubleClick={handleDoubleClick}
             onContextMenu={(e) => onContextMenu(e, file)}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
             draggable={file.type !== 'folder'}
             onDragStart={handleDragStart}
             onDragOver={handleDragOver}
@@ -441,6 +509,7 @@ function FileGrid({ onOpenFile, onSelectFile }) {
     } = useFileSystem()
 
     const [contextMenu, setContextMenu] = useState(null)
+    const [editingFileId, setEditingFileId] = useState(null)
     const files = currentFiles()
 
     const handleOpen = useCallback((file) => {
@@ -476,6 +545,14 @@ function FileGrid({ onOpenFile, onSelectFile }) {
         setContextMenu(null)
     }, [])
 
+    const handleRename = useCallback((file) => {
+        setEditingFileId(file.id)
+    }, [])
+
+    const handleEditComplete = useCallback(() => {
+        setEditingFileId(null)
+    }, [])
+
     // Close context menu on click outside
     useEffect(() => {
         if (contextMenu) {
@@ -507,6 +584,8 @@ function FileGrid({ onOpenFile, onSelectFile }) {
                             onOpen={handleOpen}
                             onContextMenu={handleContextMenu}
                             onDrop={handleDropOnFolder}
+                            isEditing={editingFileId === file.id}
+                            onEditComplete={handleEditComplete}
                         />
                     ))}
                 </div>
@@ -537,13 +616,14 @@ function FileGrid({ onOpenFile, onSelectFile }) {
                     y={contextMenu.y}
                     file={contextMenu.file}
                     onClose={closeContextMenu}
+                    onRename={handleRename}
                 />
             )}
         </div>
     )
 }
 
-function ContextMenu({ x, y, file, onClose }) {
+function ContextMenu({ x, y, file, onClose, onRename }) {
     const { deleteItems, downloadFile, navigateTo, currentPath } = useFileSystem()
     const menuRef = useRef(null)
 
@@ -570,6 +650,11 @@ function ContextMenu({ x, y, file, onClose }) {
         onClose()
     }
 
+    const handleRename = () => {
+        onRename?.(file)
+        onClose()
+    }
+
     const handleDownload = async () => {
         const buffer = await downloadFile(file.id)
         if (buffer) {
@@ -585,7 +670,8 @@ function ContextMenu({ x, y, file, onClose }) {
     }
 
     const handleDelete = async () => {
-        if (confirm(`Delete "${file.name}"?`)) {
+        const itemType = file.type === 'folder' ? 'klasörünü' : 'dosyasını'
+        if (confirm(`"${file.name}" ${itemType} silmek istediğinize emin misiniz?`)) {
             await deleteItems([file.id])
         }
         onClose()
@@ -600,18 +686,22 @@ function ContextMenu({ x, y, file, onClose }) {
         >
             <div className="context-menu-item" onClick={handleOpen}>
                 <Icons.Folder />
-                <span>Open</span>
+                <span>Aç</span>
+            </div>
+            <div className="context-menu-item" onClick={handleRename}>
+                <span>✏️</span>
+                <span>Yeniden Adlandır</span>
             </div>
             {file.type !== 'folder' && (
                 <div className="context-menu-item" onClick={handleDownload}>
                     <span>⬇️</span>
-                    <span>Download</span>
+                    <span>İndir</span>
                 </div>
             )}
             <div className="context-menu-divider"></div>
             <div className="context-menu-item danger" onClick={handleDelete}>
                 <span>🗑️</span>
-                <span>Delete</span>
+                <span>Sil</span>
             </div>
         </div>
     )

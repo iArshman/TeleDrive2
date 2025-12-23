@@ -85,20 +85,66 @@ const Icons = {
             <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
         </svg>
     ),
+    Edit: () => (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
+        </svg>
+    ),
+    Delete: () => (
+        <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+        </svg>
+    ),
 }
 
 function FolderTreeItem({ folder, level = 0 }) {
-    const { currentPath, navigateTo } = useFileSystem()
+    const { currentPath, navigateTo, renameItem, deleteItems, files } = useFileSystem()
     const [isExpanded, setIsExpanded] = useState(currentPath.startsWith(folder.path + folder.name + '/'))
+    const [isEditing, setIsEditing] = useState(false)
+    const [editName, setEditName] = useState(folder.name)
 
     const hasChildren = folder.children && folder.children.length > 0
     const folderPath = folder.path + folder.name + '/'
     const isActive = currentPath === folderPath
 
+    // Find the folder's file object to get its ID
+    const folderFile = files.find(f => f.type === 'folder' && f.path === folder.path && f.name === folder.name)
+
     const handleClick = () => {
+        if (isEditing) return
         navigateTo(folderPath)
         if (hasChildren) {
             setIsExpanded(!isExpanded)
+        }
+    }
+
+    const handleEdit = (e) => {
+        e.stopPropagation()
+        setEditName(folder.name)
+        setIsEditing(true)
+    }
+
+    const handleRename = async () => {
+        if (editName.trim() && editName !== folder.name && folderFile) {
+            await renameItem(folderFile.id, editName.trim())
+        }
+        setIsEditing(false)
+        setEditName(folder.name)
+    }
+
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            handleRename()
+        } else if (e.key === 'Escape') {
+            setIsEditing(false)
+            setEditName(folder.name)
+        }
+    }
+
+    const handleDelete = async (e) => {
+        e.stopPropagation()
+        if (folderFile && confirm(`"${folder.name}" klasörünü silmek istediğinize emin misiniz?`)) {
+            await deleteItems([folderFile.id])
         }
     }
 
@@ -115,7 +161,30 @@ function FolderTreeItem({ folder, level = 0 }) {
                 <span className="folder-icon">
                     {isExpanded && hasChildren ? <Icons.FolderOpen /> : <Icons.Folder />}
                 </span>
-                <span className="folder-name">{folder.name}</span>
+                {isEditing ? (
+                    <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        onBlur={handleRename}
+                        onKeyDown={handleKeyDown}
+                        onClick={(e) => e.stopPropagation()}
+                        className="folder-name-input"
+                        autoFocus
+                    />
+                ) : (
+                    <>
+                        <span className="folder-name">{folder.name}</span>
+                        <div className="folder-actions">
+                            <button className="folder-action-btn" onClick={handleEdit} title="Yeniden Adlandır">
+                                <Icons.Edit />
+                            </button>
+                            <button className="folder-action-btn danger" onClick={handleDelete} title="Sil">
+                                <Icons.Delete />
+                            </button>
+                        </div>
+                    </>
+                )}
             </div>
 
             {isExpanded && hasChildren && (
