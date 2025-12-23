@@ -244,6 +244,8 @@ export function FileSystemProvider({ children }) {
 
         try {
             const telegramService = await getTelegramService()
+
+            // Rename the item itself
             if (file.isManaged) {
                 const newCaption = updateMetadata(file.message, { name: newName })
                 await telegramService.editMessageCaption(file.messageId, newCaption)
@@ -256,6 +258,34 @@ export function FileSystemProvider({ children }) {
                     displayText: file.displayText,
                 })
                 await telegramService.editMessageCaption(file.messageId, metadata)
+            }
+
+            // If it's a folder, update paths of all files inside it
+            if (file.type === 'folder') {
+                const oldPath = file.path + file.name + '/'
+                const newPath = file.path + newName + '/'
+
+                // Find all files that have paths starting with the old folder path
+                const childFiles = files.filter(f =>
+                    f.id !== fileId && f.path.startsWith(oldPath)
+                )
+
+                // Update each child file's path
+                for (const childFile of childFiles) {
+                    const updatedPath = childFile.path.replace(oldPath, newPath)
+                    if (childFile.isManaged) {
+                        const childCaption = updateMetadata(childFile.message, { path: updatedPath })
+                        await telegramService.editMessageCaption(childFile.messageId, childCaption)
+                    } else {
+                        const childMetadata = createMetadata({
+                            path: updatedPath,
+                            name: childFile.name,
+                            type: childFile.type,
+                            displayText: childFile.displayText,
+                        })
+                        await telegramService.editMessageCaption(childFile.messageId, childMetadata)
+                    }
+                }
             }
 
             await loadFiles()
