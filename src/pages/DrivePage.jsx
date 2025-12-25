@@ -131,6 +131,7 @@ function DrivePage() {
                 <FilePreview
                     file={previewFile}
                     onClose={() => setPreviewFile(null)}
+                    onNavigate={(file) => setPreviewFile(file)}
                 />
             )}
         </div>
