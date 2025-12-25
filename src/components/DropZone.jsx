@@ -65,16 +65,36 @@ function DropZone({ children }) {
         if (files.length === 0) return
 
         e.stopPropagation()
-        for (const file of files) {
-            await uploadFile(file)
+
+        // Parallel upload with Promise.allSettled for better mobile performance
+        const uploadPromises = files.map(file => uploadFile(file))
+        const results = await Promise.allSettled(uploadPromises)
+
+        // Log failed uploads for debugging
+        const failed = results.filter(r => r.status === 'rejected')
+        if (failed.length > 0) {
+            console.warn(`${failed.length} of ${files.length} uploads failed:`, failed)
         }
     }, [uploadFile])
 
     const handleFileSelect = useCallback(async (e) => {
         const files = Array.from(e.target.files || [])
 
-        for (const file of files) {
-            await uploadFile(file)
+        if (files.length === 0) {
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
+            return
+        }
+
+        // Parallel upload with Promise.allSettled for better mobile performance
+        const uploadPromises = files.map(file => uploadFile(file))
+        const results = await Promise.allSettled(uploadPromises)
+
+        // Log failed uploads for debugging
+        const failed = results.filter(r => r.status === 'rejected')
+        if (failed.length > 0) {
+            console.warn(`${failed.length} of ${files.length} uploads failed:`, failed)
         }
 
         // Reset input
@@ -128,6 +148,7 @@ function DropZone({ children }) {
                                 <span className="upload-name">{upload.name}</span>
                                 <span className="upload-status">
                                     {upload.status === 'uploading' && `${upload.progress}%`}
+                                    {upload.status === 'retrying' && `Yeniden deneniyor (${upload.retries})`}
                                     {upload.status === 'complete' && '✓'}
                                     {upload.status === 'error' && '✗'}
                                 </span>

@@ -169,72 +169,108 @@ export function FileSystemProvider({ children }) {
         }
     }, [currentPath, loadFiles])
 
-    // Upload file
+    // Upload file with retry mechanism
     const uploadFile = useCallback(async (file, options = {}) => {
-        const uploadId = Date.now().toString()
+        const maxRetries = options.maxRetries ?? 3
+        const uploadId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9)
+
         setUploadProgress(prev => ({
             ...prev,
-            [uploadId]: { name: file.name, progress: 0, status: 'uploading' }
+            [uploadId]: { name: file.name, progress: 0, status: 'uploading', retries: 0 }
         }))
 
-        try {
-            const telegramService = await getTelegramService()
+        let lastError = null
 
-            // Generate UUID filename while keeping original extension
-            const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
-            const uuid = crypto.randomUUID()
-            const uniqueName = uuid + extension
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                // Update retry count in progress
+                if (attempt > 0) {
+                    setUploadProgress(prev => ({
+                        ...prev,
+                        [uploadId]: { ...prev[uploadId], retries: attempt, status: 'retrying' }
+                    }))
+                    // Exponential backoff: 1s, 2s, 4s...
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000))
+                }
 
-            const metadata = createMetadata({
-                path: currentPath,
-                name: uniqueName,
-                type: 'file',
-                tags: options.tags || [],
-                encrypted: options.encrypted || false,
-                originalName: file.name, // Store original name in metadata
-            })
+                const telegramService = await getTelegramService()
 
-            const progressCallback = (progress) => {
-                const percent = Math.round(progress * 100)
+                // Generate UUID filename while keeping original extension
+                const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
+                const uuid = crypto.randomUUID()
+                const uniqueName = uuid + extension
+
+                const metadata = createMetadata({
+                    path: currentPath,
+                    name: uniqueName,
+                    type: 'file',
+                    tags: options.tags || [],
+                    encrypted: options.encrypted || false,
+                    originalName: file.name, // Store original name in metadata
+                })
+
+                const progressCallback = (progress) => {
+                    const percent = Math.round(progress * 100)
+                    setUploadProgress(prev => ({
+                        ...prev,
+                        [uploadId]: { ...prev[uploadId], progress: percent, status: 'uploading' }
+                    }))
+                }
+
+                // Determine if it's a photo
+                const isPhoto = file.type.startsWith('image/') && !options.forceDocument
+
+                if (isPhoto) {
+                    await telegramService.sendPhoto(file, metadata, progressCallback)
+                } else {
+                    await telegramService.sendFile(file, metadata, progressCallback)
+                }
+
                 setUploadProgress(prev => ({
                     ...prev,
-                    [uploadId]: { ...prev[uploadId], progress: percent }
+                    [uploadId]: { ...prev[uploadId], progress: 100, status: 'complete' }
                 }))
+
+                // Remove from progress after delay
+                setTimeout(() => {
+                    setUploadProgress(prev => {
+                        const { [uploadId]: _, ...rest } = prev
+                        return rest
+                    })
+                }, 2000)
+
+                await loadFiles()
+                return true
+
+            } catch (err) {
+                lastError = err
+                console.warn(`Upload attempt ${attempt + 1}/${maxRetries + 1} failed for ${file.name}:`, err.message)
+
+                // Don't retry on certain errors
+                if (err.message?.includes('Client not initialized') ||
+                    err.message?.includes('not authenticated')) {
+                    break
+                }
             }
-
-            // Determine if it's a photo
-            const isPhoto = file.type.startsWith('image/') && !options.forceDocument
-
-            if (isPhoto) {
-                await telegramService.sendPhoto(file, metadata, progressCallback)
-            } else {
-                await telegramService.sendFile(file, metadata, progressCallback)
-            }
-
-            setUploadProgress(prev => ({
-                ...prev,
-                [uploadId]: { ...prev[uploadId], progress: 100, status: 'complete' }
-            }))
-
-            // Remove from progress after delay
-            setTimeout(() => {
-                setUploadProgress(prev => {
-                    const { [uploadId]: _, ...rest } = prev
-                    return rest
-                })
-            }, 2000)
-
-            await loadFiles()
-            return true
-        } catch (err) {
-            console.error('Upload error:', err)
-            setUploadProgress(prev => ({
-                ...prev,
-                [uploadId]: { ...prev[uploadId], status: 'error', error: err.message }
-            }))
-            setError('Failed to upload file')
-            return false
         }
+
+        // All retries failed
+        console.error(`Upload failed for ${file.name} after ${maxRetries + 1} attempts:`, lastError)
+        setUploadProgress(prev => ({
+            ...prev,
+            [uploadId]: { ...prev[uploadId], status: 'error', error: lastError?.message || 'Upload failed' }
+        }))
+
+        // Remove error status after longer delay
+        setTimeout(() => {
+            setUploadProgress(prev => {
+                const { [uploadId]: _, ...rest } = prev
+                return rest
+            })
+        }, 5000)
+
+        setError(`Failed to upload: ${file.name}`)
+        return false
     }, [currentPath, loadFiles])
 
     // Rename file/folder
