@@ -6,7 +6,6 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useFileSystem } from '../context/FileSystemContext'
-import { formatSize, formatDate } from '../lib/virtualFS'
 import './FilePreview.css'
 
 const CloseIcon = () => (
@@ -50,7 +49,7 @@ function ImagePreview({ file, src }) {
     const [position, setPosition] = useState({ x: 0, y: 0 })
     const [isDragging, setIsDragging] = useState(false)
     const lastPosition = useRef({ x: 0, y: 0 })
-    
+
     // Touch gesture state
     const [initialDistance, setInitialDistance] = useState(0)
     const [initialZoom, setInitialZoom] = useState(1)
@@ -277,9 +276,9 @@ function FilePreview({ file, onClose, allFiles, onNavigate }) {
     const [src, setSrc] = useState(null)
     const [isLoading, setIsLoading] = useState(true)
     const [downloadProgress, setDownloadProgress] = useState(0)
-    
+
     // Get navigable files (images and videos from current folder)
-    const navigableFiles = (allFiles || currentFiles()).filter(f => 
+    const navigableFiles = (allFiles || currentFiles()).filter(f =>
         f.type !== 'folder' && ['image', 'video'].includes(f.fileType)
     )
     const currentIndex = navigableFiles.findIndex(f => f.id === file.id)
@@ -303,7 +302,7 @@ function FilePreview({ file, onClose, allFiles, onNavigate }) {
         setIsLoading(true)
         setDownloadProgress(0)
         setSrc(null)
-        
+
         try {
             const buffer = await downloadFile(file.id, (progress) => {
                 // GramJS sends progress as a value between 0 and 1, or as bytes
@@ -421,11 +420,6 @@ function FilePreview({ file, onClose, allFiles, onNavigate }) {
             <div className="preview-container" onClick={e => e.stopPropagation()}>
                 <div className="preview-header">
                     <h2 className="preview-title">{file.name}</h2>
-                    <div className="preview-meta">
-                        <span>{formatSize(file.size)}</span>
-                        <span>•</span>
-                        <span>{formatDate(file.modifiedAt)}</span>
-                    </div>
                     <div className="preview-actions">
                         <button className="btn-icon" onClick={handleDownload} title="İndir">
                             <DownloadIcon />
@@ -439,8 +433,8 @@ function FilePreview({ file, onClose, allFiles, onNavigate }) {
                 <div className="preview-body">
                     {/* Left Navigation Arrow */}
                     {isNavigable && hasPrev && (
-                        <button 
-                            className="nav-arrow nav-arrow-left" 
+                        <button
+                            className="nav-arrow nav-arrow-left"
                             onClick={(e) => { e.stopPropagation(); navigateToPrev(); }}
                             title="Önceki"
                         >
@@ -452,8 +446,8 @@ function FilePreview({ file, onClose, allFiles, onNavigate }) {
 
                     {/* Right Navigation Arrow */}
                     {isNavigable && hasNext && (
-                        <button 
-                            className="nav-arrow nav-arrow-right" 
+                        <button
+                            className="nav-arrow nav-arrow-right"
                             onClick={(e) => { e.stopPropagation(); navigateToNext(); }}
                             title="Sonraki"
                         >
