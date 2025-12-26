@@ -7,6 +7,7 @@
 import { TelegramClient, Api } from 'telegram'
 import { StringSession } from 'telegram/sessions'
 import { CustomFile } from 'telegram/client/uploads'
+import localforage from 'localforage'
 
 // API Credentials from Telegram App Configuration
 const API_ID = 19527810
@@ -15,6 +16,44 @@ const API_HASH = '247d76d57082a5f89609e5010283a919'
 // Session storage key
 const SESSION_KEY = 'teledrive_session'
 const ACCOUNTS_KEY = 'teledrive_accounts'
+
+// Create localforage instance for auth data
+const authStorage = localforage.createInstance({
+    name: 'TeleDrive',
+    storeName: 'auth'
+})
+
+// Migrate data from localStorage to localforage (runs once)
+const migrateFromLocalStorage = async () => {
+    try {
+        // Check if migration already done
+        const migrated = await authStorage.getItem('_migrated')
+        if (migrated) return
+
+        // Migrate session
+        const oldSession = localStorage.getItem(SESSION_KEY)
+        if (oldSession) {
+            await authStorage.setItem(SESSION_KEY, oldSession)
+            localStorage.removeItem(SESSION_KEY)
+        }
+
+        // Migrate accounts
+        const oldAccounts = localStorage.getItem(ACCOUNTS_KEY)
+        if (oldAccounts) {
+            await authStorage.setItem(ACCOUNTS_KEY, JSON.parse(oldAccounts))
+            localStorage.removeItem(ACCOUNTS_KEY)
+        }
+
+        // Mark migration as complete
+        await authStorage.setItem('_migrated', true)
+        console.log('TeleDrive: Auth data migrated to IndexedDB')
+    } catch (e) {
+        console.warn('Migration from localStorage failed:', e)
+    }
+}
+
+// Run migration on load
+migrateFromLocalStorage()
 
 class TelegramService {
     constructor() {
@@ -330,22 +369,22 @@ class TelegramService {
     }
 
     /**
-     * Save session to localStorage
+     * Save session to IndexedDB
      */
-    saveSession(sessionString) {
+    async saveSession(sessionString) {
         try {
-            localStorage.setItem(SESSION_KEY, sessionString)
+            await authStorage.setItem(SESSION_KEY, sessionString)
         } catch (e) {
             console.error('Failed to save session:', e)
         }
     }
 
     /**
-     * Load session from localStorage
+     * Load session from IndexedDB
      */
-    loadSession() {
+    async loadSession() {
         try {
-            return localStorage.getItem(SESSION_KEY) || ''
+            return await authStorage.getItem(SESSION_KEY) || ''
         } catch {
             return ''
         }
@@ -354,9 +393,9 @@ class TelegramService {
     /**
      * Clear session
      */
-    clearSession() {
+    async clearSession() {
         try {
-            localStorage.removeItem(SESSION_KEY)
+            await authStorage.removeItem(SESSION_KEY)
         } catch (e) {
             console.error('Failed to clear session:', e)
         }
@@ -373,7 +412,7 @@ class TelegramService {
                 console.error('Logout error:', e)
             }
         }
-        this.clearSession()
+        await this.clearSession()
         this.client = null
         this.session = null
     }
@@ -381,10 +420,10 @@ class TelegramService {
     /**
      * Get all saved accounts
      */
-    getAccounts() {
+    async getAccounts() {
         try {
-            const accounts = localStorage.getItem(ACCOUNTS_KEY)
-            return accounts ? JSON.parse(accounts) : []
+            const accounts = await authStorage.getItem(ACCOUNTS_KEY)
+            return accounts || []
         } catch {
             return []
         }
@@ -393,22 +432,22 @@ class TelegramService {
     /**
      * Add account to saved accounts
      */
-    addAccount(account) {
-        const accounts = this.getAccounts()
+    async addAccount(account) {
+        const accounts = await this.getAccounts()
         const exists = accounts.find(a => a.id === account.id)
         if (!exists) {
             accounts.push(account)
-            localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts))
+            await authStorage.setItem(ACCOUNTS_KEY, accounts)
         }
     }
 
     /**
      * Remove account from saved accounts
      */
-    removeAccount(accountId) {
-        const accounts = this.getAccounts()
+    async removeAccount(accountId) {
+        const accounts = await this.getAccounts()
         const filtered = accounts.filter(a => a.id !== accountId)
-        localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(filtered))
+        await authStorage.setItem(ACCOUNTS_KEY, filtered)
     }
 
     /**

@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
 
         try {
             const service = await getTelegramService()
-            const savedSession = service.loadSession()
+            const savedSession = await service.loadSession()
             await service.init(savedSession)
 
             if (savedSession) {
@@ -53,7 +53,7 @@ export function AuthProvider({ children }) {
                     setIsAuthenticated(true)
 
                     if (me) {
-                        service.addAccount({
+                        await service.addAccount({
                             id: me.id.toString(),
                             firstName: me.firstName,
                             lastName: me.lastName,
@@ -108,7 +108,7 @@ export function AuthProvider({ children }) {
 
             if (me) {
                 const session = service.session.save()
-                service.addAccount({
+                await service.addAccount({
                     id: me.id.toString(),
                     firstName: me.firstName,
                     lastName: me.lastName,
@@ -147,7 +147,7 @@ export function AuthProvider({ children }) {
 
             if (me) {
                 const session = service.session.save()
-                service.addAccount({
+                await service.addAccount({
                     id: me.id.toString(),
                     firstName: me.firstName,
                     lastName: me.lastName,
@@ -206,28 +206,23 @@ export function AuthProvider({ children }) {
         }
     }, [getTelegramService])
 
-    const getAccounts = useCallback(() => {
-        // Sync access to localStorage - doesn't need async
+    const getAccounts = useCallback(async () => {
         try {
-            const accounts = localStorage.getItem('teledrive_accounts')
-            return accounts ? JSON.parse(accounts) : []
+            const service = await getTelegramService()
+            return await service.getAccounts()
         } catch {
             return []
         }
-    }, [])
+    }, [getTelegramService])
 
-    const removeAccount = useCallback((accountId) => {
+    const removeAccount = useCallback(async (accountId) => {
         try {
-            const accounts = localStorage.getItem('teledrive_accounts')
-            if (accounts) {
-                const parsed = JSON.parse(accounts)
-                const filtered = parsed.filter(a => a.id !== accountId)
-                localStorage.setItem('teledrive_accounts', JSON.stringify(filtered))
-            }
+            const service = await getTelegramService()
+            await service.removeAccount(accountId)
         } catch (e) {
             console.error('Remove account error:', e)
         }
-    }, [])
+    }, [getTelegramService])
 
     const value = {
         isAuthenticated,

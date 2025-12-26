@@ -6,21 +6,41 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { useFileSystem } from '../context/FileSystemContext'
 import { formatSize, formatDate, getFileIcon } from '../lib/virtualFS'
 import { Icons } from './Sidebar'
+import localforage from 'localforage'
 import './FileGrid.css'
 
 // File type icons as SVG
 // Thumbnail cache to avoid reloading
 const thumbnailCache = new Map()
 
-// Get cached thumbnail from localStorage on load
-const loadCachedThumbnails = () => {
+// Create localforage instance for thumbnail cache
+const thumbnailStorage = localforage.createInstance({
+    name: 'TeleDrive',
+    storeName: 'grid_thumbnails'
+})
+
+// Get cached thumbnail from IndexedDB on load
+const loadCachedThumbnails = async () => {
     try {
-        const cached = localStorage.getItem('teledrive_thumbnails')
-        if (cached) {
-            const parsed = JSON.parse(cached)
-            Object.entries(parsed).forEach(([key, value]) => {
+        // Migrate from localStorage if exists
+        const oldCached = localStorage.getItem('teledrive_thumbnails')
+        if (oldCached) {
+            const parsed = JSON.parse(oldCached)
+            for (const [key, value] of Object.entries(parsed)) {
                 thumbnailCache.set(key, value)
-            })
+            }
+            // Save to IndexedDB and remove from localStorage
+            await thumbnailStorage.setItem('cache', parsed)
+            localStorage.removeItem('teledrive_thumbnails')
+            console.log('TeleDrive: Thumbnail cache migrated to IndexedDB')
+        } else {
+            // Load from IndexedDB
+            const cached = await thumbnailStorage.getItem('cache')
+            if (cached) {
+                Object.entries(cached).forEach(([key, value]) => {
+                    thumbnailCache.set(key, value)
+                })
+            }
         }
     } catch (e) {
         console.warn('Failed to load thumbnail cache:', e)
@@ -29,17 +49,17 @@ const loadCachedThumbnails = () => {
 loadCachedThumbnails()
 
 // Save thumbnail to cache
-const saveThumbnailToCache = (fileId, dataUrl) => {
+const saveThumbnailToCache = async (fileId, dataUrl) => {
     thumbnailCache.set(fileId, dataUrl)
     // Limit cache size
     if (thumbnailCache.size > 100) {
         const firstKey = thumbnailCache.keys().next().value
         thumbnailCache.delete(firstKey)
     }
-    // Save to localStorage (limited to 50 entries for storage limits)
+    // Save to IndexedDB (limited to 50 entries for storage limits)
     try {
         const entries = Array.from(thumbnailCache.entries()).slice(-50)
-        localStorage.setItem('teledrive_thumbnails', JSON.stringify(Object.fromEntries(entries)))
+        await thumbnailStorage.setItem('cache', Object.fromEntries(entries))
     } catch (e) {
         console.warn('Failed to save thumbnail cache:', e)
     }
@@ -684,10 +704,6 @@ function ContextMenu({ x, y, file, onClose, onRename }) {
             style={{ left: x, top: y }}
             onClick={(e) => e.stopPropagation()}
         >
-            <div className="context-menu-item" onClick={handleOpen}>
-                <Icons.Folder />
-                <span>Aç</span>
-            </div>
             <div className="context-menu-item" onClick={handleRename}>
                 <span>✏️</span>
                 <span>Yeniden Adlandır</span>
