@@ -244,15 +244,17 @@ class TelegramService {
             {
                 connectionRetries: 5,
                 useWSS: true,
-                baseLogger: {
-                    log: () => { },
-                    info: () => { },
-                    warn: console.warn,
-                    error: console.error,
-                    debug: () => { },
-                }
             }
         )
+
+        // Silence GramJS internal logger after construction
+        try {
+            if (this.client._log) {
+                this.client._log.setLevel('none')
+            }
+        } catch {
+            // ignore if logger API not available
+        }
 
         await this.client.connect()
         return this.client
