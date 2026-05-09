@@ -53,23 +53,23 @@ export function AuthProvider({ children }) {
     }
 
     /**
-     * Handle Telegram Login Widget callback
+     * Login with code from Telegram bot
      */
-    const loginWithTelegram = useCallback(async (authData) => {
+    const login = useCallback(async (authCode) => {
         setError(null)
         setIsLoading(true)
 
         try {
             const service = await getBotService()
-            const user = await service.verifyAuth(authData)
+            const userData = await service.verifyAuthCode(authCode)
 
-            setUser(user)
+            setUser(userData)
             setIsAuthenticated(true)
 
             return true
         } catch (err) {
-            console.error('Telegram login error:', err)
-            setError(err.message || 'Login failed')
+            console.error('Login error:', err)
+            setError(err.message || 'Invalid code. Please try again.')
             return false
         } finally {
             setIsLoading(false)
@@ -98,7 +98,7 @@ export function AuthProvider({ children }) {
         isLoading,
         user,
         error,
-        loginWithTelegram,
+        login,
         logout,
         setError,
     }

@@ -50,11 +50,10 @@
     font-size: 14px;
 }
 
-/* ---- Telegram Login Section ---- */
-.telegram-login-section {
+/* ---- Login Section ---- */
+.login-section {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: var(--spacing-lg);
 }
 
@@ -62,50 +61,159 @@
     text-align: center;
     color: var(--text-secondary);
     font-size: 14px;
-    line-height: 1.5;
+    line-height: 1.6;
 }
 
-.telegram-widget-wrapper {
-    min-height: 60px;
+/* Telegram Button */
+.btn-telegram {
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: var(--spacing-sm);
+    width: 100%;
+    padding: var(--spacing-md) var(--spacing-xl);
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    background: linear-gradient(135deg, #0088cc, #00a8e8);
+    border: none;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    min-height: 52px;
 }
 
-.telegram-widget {
+.btn-telegram:hover:not(:disabled) {
+    background: linear-gradient(135deg, #0077b5, #0099d6);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 136, 204, 0.3);
+}
+
+.btn-telegram:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.telegram-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.config-warning {
+    text-align: center;
+    font-size: 12px;
+    color: var(--warning, #f59e0b);
+    padding: var(--spacing-sm);
+    background: rgba(245, 158, 11, 0.1);
+    border-radius: var(--radius-sm);
+}
+
+/* Divider */
+.login-divider {
     display: flex;
-    justify-content: center;
+    align-items: center;
+    gap: var(--spacing-md);
+    margin: var(--spacing-md) 0;
 }
 
-.widget-loading,
-.widget-placeholder {
+.login-divider::before,
+.login-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.login-divider span {
+    font-size: 12px;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Steps */
+.login-steps {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.login-steps li {
     display: flex;
     align-items: center;
     gap: var(--spacing-sm);
+    font-size: 13px;
     color: var(--text-secondary);
-    font-size: 14px;
+    padding: var(--spacing-sm) 0;
 }
 
-.login-features {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: var(--spacing-lg);
-    margin-top: var(--spacing-md);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--border-color);
-}
-
-.feature {
+.login-steps li::before {
+    content: counter(step);
+    counter-increment: step;
     display: flex;
     align-items: center;
-    gap: var(--spacing-xs);
+    justify-content: center;
+    width: 24px;
+    height: 24px;
     font-size: 12px;
+    font-weight: 600;
+    color: var(--accent-primary);
+    background: rgba(53, 132, 228, 0.1);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.login-steps {
+    counter-reset: step;
+}
+
+/* Back button */
+.btn-back {
+    align-self: flex-start;
+    background: none;
+    border: none;
+    font-size: 14px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-xs) 0;
+    transition: color var(--transition-fast);
+}
+
+.btn-back:hover {
+    color: var(--text-primary);
+}
+
+/* Code input */
+.code-input {
+    text-align: center;
+    font-size: 24px !important;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+
+/* Help text */
+.help-text {
+    text-align: center;
+    font-size: 13px;
     color: var(--text-tertiary);
 }
 
-.feature-icon {
-    font-size: 14px;
+.link-btn {
+    background: none;
+    border: none;
+    color: var(--accent-primary);
+    cursor: pointer;
+    font-size: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.link-btn:hover {
+    color: var(--accent-hover, var(--accent-primary));
 }
 
 .login-error {

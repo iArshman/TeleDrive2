@@ -25,24 +25,23 @@ class TelegramBotService {
     }
 
     /**
-     * Verify Telegram Login Widget authentication
+     * Verify auth code from Telegram bot
      */
-    async verifyAuth(authData) {
+    async verifyAuthCode(code) {
         const response = await fetch(`${API_BASE}/auth`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(authData),
+            body: JSON.stringify({ code }),
         })
 
         const result = await response.json()
 
         if (!response.ok) {
-            throw new Error(result.error || 'Authentication failed')
+            throw new Error(result.error || 'Invalid authentication code')
         }
 
         this.user = result.user
         await userStorage.setItem('user', this.user)
-        await userStorage.setItem('authData', authData)
 
         return result.user
     }

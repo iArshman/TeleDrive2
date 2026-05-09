@@ -1,51 +1,61 @@
 /**
- * Telegram Login Widget Authentication
- * Verifies the hash from Telegram Login Widget
+ * Telegram Bot Code-based Authentication
+ * Verifies auth codes sent by the Telegram bot
+ * 
+ * The bot stores auth codes in a simple in-memory map (or you can use Redis/DB).
+ * For this demo, we use a static map that the bot webhook would update.
  */
 
-import crypto from 'crypto'
+// In-memory auth codes store (in production, use Redis or database)
+// Format: { code: { userId, firstName, lastName, username, expiresAt } }
+const authCodes = new Map()
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
+// Cleanup expired codes periodically
+setInterval(() => {
+    const now = Date.now()
+    for (const [code, data] of authCodes) {
+        if (data.expiresAt < now) {
+            authCodes.delete(code)
+        }
+    }
+}, 60000) // Clean every minute
 
-function verifyTelegramAuth(data) {
-    if (!BOT_TOKEN) {
-        throw new Error('TELEGRAM_BOT_TOKEN not configured')
+/**
+ * Store an auth code (called by bot webhook)
+ */
+export function storeAuthCode(code, userData) {
+    authCodes.set(code.toUpperCase(), {
+        ...userData,
+        expiresAt: Date.now() + 5 * 60 * 1000, // 5 minutes
+    })
+}
+
+/**
+ * Verify and consume an auth code
+ */
+function verifyAuthCode(code) {
+    const upperCode = code.toUpperCase()
+    const data = authCodes.get(upperCode)
+
+    if (!data) {
+        return { valid: false, error: 'Invalid or expired code' }
     }
 
-    const { hash, ...authData } = data
-
-    // Create data-check-string
-    const checkArr = Object.keys(authData)
-        .sort()
-        .map(key => `${key}=${authData[key]}`)
-    const checkString = checkArr.join('\n')
-
-    // Create secret key from bot token
-    const secretKey = crypto.createHash('sha256').update(BOT_TOKEN).digest()
-
-    // Calculate HMAC
-    const hmac = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex')
-
-    // Verify hash matches
-    if (hmac !== hash) {
-        return { valid: false, error: 'Invalid authentication hash' }
+    if (data.expiresAt < Date.now()) {
+        authCodes.delete(upperCode)
+        return { valid: false, error: 'Code expired. Please request a new one.' }
     }
 
-    // Check auth_date is not too old (24 hours)
-    const authDate = parseInt(authData.auth_date, 10)
-    const now = Math.floor(Date.now() / 1000)
-    if (now - authDate > 86400) {
-        return { valid: false, error: 'Authentication expired' }
-    }
+    // Consume the code (one-time use)
+    authCodes.delete(upperCode)
 
     return {
         valid: true,
         user: {
-            id: authData.id,
-            firstName: authData.first_name,
-            lastName: authData.last_name || '',
-            username: authData.username || '',
-            photoUrl: authData.photo_url || '',
+            id: data.userId,
+            firstName: data.firstName,
+            lastName: data.lastName || '',
+            username: data.username || '',
         }
     }
 }
@@ -65,7 +75,13 @@ export default async function handler(req, res) {
     }
 
     try {
-        const result = verifyTelegramAuth(req.body)
+        const { code } = req.body
+
+        if (!code) {
+            return res.status(400).json({ error: 'Authentication code required' })
+        }
+
+        const result = verifyAuthCode(code)
 
         if (!result.valid) {
             return res.status(401).json({ error: result.error })
@@ -80,3 +96,6 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: error.message || 'Authentication failed' })
     }
 }
+
+// Export for bot webhook to use
+export { authCodes }
