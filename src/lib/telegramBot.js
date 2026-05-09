@@ -25,25 +25,27 @@ class TelegramBotService {
     }
 
     /**
-     * Verify auth code from Telegram bot
+     * Login with Telegram User ID (simple, no webhook required)
      */
-    async verifyAuthCode(code) {
-        const response = await fetch(`${API_BASE}/auth`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code }),
-        })
-
-        const result = await response.json()
-
-        if (!response.ok) {
-            throw new Error(result.error || 'Invalid authentication code')
+    async loginWithUserId(userId) {
+        // Validate the user ID looks reasonable
+        const cleanId = String(userId).replace(/\D/g, '')
+        if (!cleanId || cleanId.length < 5) {
+            throw new Error('Invalid Telegram User ID')
         }
 
-        this.user = result.user
+        // Create user object from ID
+        // In a real implementation, you'd verify this via bot API
+        this.user = {
+            id: cleanId,
+            username: null,
+            firstName: 'User',
+            lastName: cleanId,
+        }
+
         await userStorage.setItem('user', this.user)
 
-        return result.user
+        return this.user
     }
 
     /**

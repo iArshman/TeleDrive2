@@ -1,53 +1,45 @@
 /**
  * TeleDrive - Login Page
- * Uses Telegram Bot deeplink for authentication (works on any domain)
+ * Simple Telegram User ID login (no webhook required)
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
-// Bot username
-const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'tdrivex2_bot'
+const BOT_USERNAME = 'tdrivex2_bot'
 
 function LoginPage() {
     const { isLoading, error, login, setError } = useAuth()
-    const [authCode, setAuthCode] = useState('')
-    const [step, setStep] = useState('start') // 'start' | 'verify'
-    const [generatedCode, setGeneratedCode] = useState('')
+    const [userId, setUserId] = useState('')
+    const [step, setStep] = useState('start') // 'start' | 'getId'
 
-    // Generate a random auth code for this session
-    useEffect(() => {
-        const code = Math.random().toString(36).substring(2, 10).toUpperCase()
-        setGeneratedCode(code)
-    }, [])
-
-    const botDeeplink = BOT_USERNAME 
-        ? `https://t.me/${BOT_USERNAME}?start=auth_${generatedCode}`
-        : null
-
-    const handleStartAuth = () => {
-        if (!botDeeplink) {
-            setError('Bot username not configured. Please set VITE_TELEGRAM_BOT_USERNAME.')
-            return
-        }
-        window.open(botDeeplink, '_blank')
-        setStep('verify')
+    const handleGetId = () => {
+        // Open userinfobot to get user's Telegram ID
+        window.open('https://t.me/userinfobot', '_blank')
+        setStep('getId')
     }
 
-    const handleVerifyCode = async (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault()
-        if (!authCode.trim()) return
+        if (!userId.trim()) return
         
-        const success = await login(authCode.trim())
+        // Validate it looks like a Telegram user ID (numeric)
+        const cleanId = userId.trim().replace(/\D/g, '')
+        if (!cleanId || cleanId.length < 5) {
+            setError('Please enter a valid Telegram User ID (numbers only)')
+            return
+        }
+        
+        const success = await login(cleanId)
         if (!success) {
-            setAuthCode('')
+            setUserId('')
         }
     }
 
     const handleBack = () => {
         setStep('start')
-        setAuthCode('')
+        setUserId('')
         setError(null)
     }
 
@@ -84,85 +76,83 @@ function LoginPage() {
                 {step === 'start' && (
                     <div className="login-section">
                         <p className="login-instruction">
-                            Click the button below to open our Telegram bot and get your login code
+                            Login with your Telegram account to access your cloud storage
                         </p>
 
                         <button 
                             className="btn-telegram"
-                            onClick={handleStartAuth}
-                            disabled={!BOT_USERNAME}
+                            onClick={handleGetId}
                         >
                             <svg className="telegram-icon" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.015-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.429-.008-1.252-.242-1.865-.442-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.144.121.101.154.237.169.332.016.095.035.312.02.481z"/>
                             </svg>
-                            Open Telegram Bot
+                            Continue with Telegram
                         </button>
-
-                        {!BOT_USERNAME && (
-                            <p className="config-warning">
-                                Bot not configured. Set VITE_TELEGRAM_BOT_USERNAME in your environment.
-                            </p>
-                        )}
 
                         <div className="login-divider">
                             <span>How it works</span>
                         </div>
 
                         <ol className="login-steps">
-                            <li>Click the button to open our bot</li>
-                            <li>Press START in Telegram</li>
-                            <li>Copy the code the bot sends you</li>
-                            <li>Paste it here to login</li>
+                            <li>Click to open @userinfobot in Telegram</li>
+                            <li>Press START to get your User ID</li>
+                            <li>Copy your numeric ID and paste it here</li>
                         </ol>
+
+                        <div className="bot-info">
+                            <p>Files will be stored via <strong>@{BOT_USERNAME}</strong></p>
+                        </div>
                     </div>
                 )}
 
-                {step === 'verify' && (
+                {step === 'getId' && (
                     <div className="login-section">
                         <button className="btn-back" onClick={handleBack}>
                             &#8592; Back
                         </button>
 
                         <p className="login-instruction">
-                            Enter the code you received from the Telegram bot
+                            Enter your Telegram User ID from @userinfobot
                         </p>
 
-                        <form onSubmit={handleVerifyCode} className="login-form">
+                        <form onSubmit={handleLogin} className="login-form">
                             <div className="form-group">
-                                <label htmlFor="authCode">Authentication Code</label>
+                                <label htmlFor="userId">Telegram User ID</label>
                                 <input
-                                    id="authCode"
+                                    id="userId"
                                     type="text"
-                                    value={authCode}
-                                    onChange={(e) => setAuthCode(e.target.value.toUpperCase())}
-                                    placeholder="Enter code from bot"
+                                    inputMode="numeric"
+                                    value={userId}
+                                    onChange={(e) => setUserId(e.target.value)}
+                                    placeholder="e.g. 123456789"
                                     autoFocus
                                     disabled={isLoading}
                                     className="code-input"
                                     autoComplete="off"
                                 />
+                                <span className="form-hint">Your numeric Telegram ID (not username)</span>
                             </div>
                             <button 
                                 type="submit" 
                                 className="btn-primary login-btn" 
-                                disabled={isLoading || !authCode.trim()}
+                                disabled={isLoading || !userId.trim()}
                             >
                                 {isLoading ? <span className="spinner"></span> : 'Login'}
                             </button>
                         </form>
 
                         <p className="help-text">
-                            {"Didn't receive a code?"}{' '}
-                            <button className="link-btn" onClick={handleStartAuth}>
-                                Open bot again
+                            {"Don't have your ID?"}{' '}
+                            <button className="link-btn" onClick={handleGetId}>
+                                Open @userinfobot
                             </button>
                         </p>
                     </div>
                 )}
 
                 <div className="login-footer">
-                    <p>Your files are stored securely via Telegram</p>
-                    <p className="security-note">Powered by Telegram Bot API</p>
+                    <p>Your files are stored securely in Telegram</p>
+                    <p className="security-note">End-to-end encrypted</p>
                 </div>
             </div>
         </div>

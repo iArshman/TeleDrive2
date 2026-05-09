@@ -170,6 +170,20 @@
     counter-reset: step;
 }
 
+/* Bot info */
+.bot-info {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    padding: var(--spacing-sm);
+    background: var(--bg-primary);
+    border-radius: var(--radius-sm);
+}
+
+.bot-info strong {
+    color: var(--accent-primary);
+}
+
 /* Back button */
 .btn-back {
     align-self: flex-start;
