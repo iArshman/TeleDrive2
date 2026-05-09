@@ -1,6 +1,6 @@
 /**
  * TeleDrive - Authentication Context
- * Uses Telegram Login Widget + Bot API (no GramJS)
+ * No login required - uses bot token directly
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -8,9 +8,10 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false)
-    const [isLoading, setIsLoading] = useState(true)
-    const [user, setUser] = useState(null)
+    // Always authenticated since we use bot token
+    const [isAuthenticated, setIsAuthenticated] = useState(true)
+    const [isLoading, setIsLoading] = useState(false)
+    const [user, setUser] = useState({ id: 'owner', name: 'TeleDrive User' })
     const [error, setError] = useState(null)
 
     // Lazy-loaded bot service reference
@@ -25,67 +26,16 @@ export function AuthProvider({ children }) {
         return botServiceRef.current
     }, [])
 
-    // Initialize on mount - check for saved session
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            initializeAuth()
-        }, 100)
-        return () => clearTimeout(timer)
-    }, [])
-
-    const initializeAuth = async () => {
-        setIsLoading(true)
-        setError(null)
-
-        try {
-            const service = await getBotService()
-            const savedUser = await service.loadSession()
-
-            if (savedUser) {
-                setUser(savedUser)
-                setIsAuthenticated(true)
-            }
-        } catch (err) {
-            console.error('Auth initialization error:', err)
-        } finally {
-            setIsLoading(false)
-        }
-    }
-
     /**
-     * Login with Telegram User ID
-     */
-    const login = useCallback(async (telegramUserId) => {
-        setError(null)
-        setIsLoading(true)
-
-        try {
-            const service = await getBotService()
-            const userData = await service.loginWithUserId(telegramUserId)
-
-            setUser(userData)
-            setIsAuthenticated(true)
-
-            return true
-        } catch (err) {
-            console.error('Login error:', err)
-            setError(err.message || 'Login failed. Please try again.')
-            return false
-        } finally {
-            setIsLoading(false)
-        }
-    }, [getBotService])
-
-    /**
-     * Logout
+     * Logout - just clears local state
      */
     const logout = useCallback(async () => {
         setIsLoading(true)
         try {
             const service = await getBotService()
             await service.logout()
-            setUser(null)
-            setIsAuthenticated(false)
+            // Still authenticated but clear files
+            setUser({ id: 'owner', name: 'TeleDrive User' })
         } catch (err) {
             console.error('Logout error:', err)
         } finally {
@@ -98,9 +48,9 @@ export function AuthProvider({ children }) {
         isLoading,
         user,
         error,
-        login,
         logout,
         setError,
+        getBotService,
     }
 
     return (
