@@ -677,4 +677,4 @@ class TelegramService {
 const telegramService = new TelegramService()
 
 export default telegramService
-export { TelegramService }
+export { TelegramService, normaliseSession }
