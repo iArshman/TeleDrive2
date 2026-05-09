@@ -220,24 +220,12 @@ class TelegramService {
     }
 
     /**
-     * Initialize the Telegram client
+     * Build client instance without connecting.
+     * Call connect() separately only when you have a real session string.
      */
-    async init(sessionString = '', credentials = null) {
-        // Resolve credentials: argument > instance > stored
-        if (credentials && credentials.apiId && credentials.apiHash) {
-            this.apiId = Number(credentials.apiId)
-            this.apiHash = String(credentials.apiHash)
-        } else if (!this.apiId || !this.apiHash) {
-            await this.loadCredentials()
-        }
-
-        if (!this.apiId || !this.apiHash) {
-            throw new Error('API credentials not set. Please enter your API ID and API Hash.')
-        }
-
-        // Disconnect existing client before replacing it
+    _buildClient(sessionString = '') {
         if (this.client) {
-            try { await this.client.disconnect() } catch { /* ignore */ }
+            try { this.client.disconnect() } catch { /* ignore */ }
             this.client = null
         }
 
@@ -256,38 +244,68 @@ class TelegramService {
 
         // Silence GramJS internal logger after construction
         try {
-            if (this.client._log) {
-                this.client._log.setLevel('none')
-            }
-        } catch {
-            // ignore if logger API not available
-        }
+            if (this.client._log) this.client._log.setLevel('none')
+        } catch { /* ignore */ }
 
-        console.log('[v0] TelegramService.init: starting connect(), apiId =', this.apiId, 'sessionLen =', sessionString.length)
-
-        // Connect with a timeout so it doesn't hang forever
-        await Promise.race([
-            this.client.connect().then(() => console.log('[v0] TelegramService.init: connect() resolved')),
-            new Promise((_, reject) =>
-                setTimeout(() => {
-                    console.log('[v0] TelegramService.init: connect() TIMED OUT after 15s')
-                    reject(new Error('Connection timeout. Check your internet connection and try again.'))
-                }, 15000)
-            )
-        ])
-
-        console.log('[v0] TelegramService.init: done')
         return this.client
     }
 
     /**
+     * Initialize the Telegram client.
+     * Only connects when sessionString is non-empty — an empty string means
+     * "just build the client so sendCode() can be called later", which avoids
+     * the full MTProto key-exchange that hangs in a browser with no session.
+     */
+    async init(sessionString = '', credentials = null) {
+        // Resolve credentials: argument > instance > stored
+        if (credentials && credentials.apiId && credentials.apiHash) {
+            this.apiId = Number(credentials.apiId)
+            this.apiHash = String(credentials.apiHash)
+        } else if (!this.apiId || !this.apiHash) {
+            await this.loadCredentials()
+        }
+
+        if (!this.apiId || !this.apiHash) {
+            throw new Error('API credentials not set. Please enter your API ID and API Hash.')
+        }
+
+        this._buildClient(sessionString)
+
+        // Only attempt to connect when we have an actual session.
+        // An empty session would trigger a full key-exchange which hangs in browser.
+        if (sessionString && sessionString.length > 10) {
+            await Promise.race([
+                this.client.connect(),
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Connection timeout — check your internet connection.')), 20000)
+                )
+            ])
+        }
+
+        return this.client
+    }
+
+    /**
+     * Connect for the first time (phone login flow).
+     * Called internally by sendCode() before making the first API call.
+     */
+    async _ensureConnected() {
+        if (!this.client) throw new Error('Client not built — call init() first')
+        if (this.client.connected) return
+        await Promise.race([
+            this.client.connect(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Connection timeout — check your internet connection.')), 20000)
+            )
+        ])
+    }
+
+    /**
      * Check if user is authenticated.
-     * Uses checkAuthorization which is lighter than getMe() and doesn't stall.
      */
     async isAuthenticated() {
         if (!this.client) return false
         try {
-            // client.isUserAuthorized() is synchronous in GramJS — checks local session state
             return await this.client.isUserAuthorized()
         } catch {
             return false
@@ -301,6 +319,9 @@ class TelegramService {
         if (!this.client) {
             throw new Error('Client not initialized')
         }
+
+        // For phone flow, client was built without connecting — connect now
+        await this._ensureConnected()
 
         const result = await this.client.sendCode(
             {
@@ -375,12 +396,8 @@ class TelegramService {
     async getMe() {
         if (!this.client) return null
         try {
-            console.log('[v0] getMe: calling client.getMe()')
-            const me = await this.client.getMe()
-            console.log('[v0] getMe: returned', me ? me.id?.toString() : null)
-            return me
-        } catch (err) {
-            console.error('[v0] getMe: error', err)
+            return await this.client.getMe()
+        } catch {
             return null
         }
     }

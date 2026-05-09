@@ -55,9 +55,12 @@ export function AuthProvider({ children }) {
             setHasCredentials(true)
 
             const savedSession = await service.loadSession()
-            await service.init(savedSession)
 
-            if (savedSession) {
+            // Only attempt to restore a session if one is actually saved.
+            // Calling init('') with no session would trigger a full MTProto
+            // key-exchange in the browser which hangs indefinitely.
+            if (savedSession && savedSession.length > 10) {
+                await service.init(savedSession)
                 const me = await service.getMe()
                 if (me) {
                     setUser(me)
@@ -111,6 +114,8 @@ export function AuthProvider({ children }) {
 
         try {
             const service = await getTelegramService()
+            // Build client with empty session (no connect yet); sendCode() will connect
+            await service.init('')
             const result = await service.sendCode(phone)
             setPhoneNumber(phone)
             setPhoneCodeHash(result.phoneCodeHash)
@@ -204,17 +209,12 @@ export function AuthProvider({ children }) {
         setIsLoading(true)
 
         try {
-            console.log('[v0] loginWithSession: normalising session')
-            const { session: sessionString, converted, type } = normaliseSession(rawSession)
-            console.log('[v0] loginWithSession: type =', type, 'converted =', converted)
+            const { session: sessionString, type } = normaliseSession(rawSession)
 
             const service = await getTelegramService()
-            console.log('[v0] loginWithSession: calling service.init()')
             await service.init(sessionString)
-            console.log('[v0] loginWithSession: init() done, calling getMe()')
 
             const me = await service.getMe()
-            console.log('[v0] loginWithSession: getMe() returned', me ? me.id?.toString() : null)
 
             if (!me) {
                 throw new Error(
@@ -238,14 +238,12 @@ export function AuthProvider({ children }) {
                 session: sessionString,
             })
 
-            console.log('[v0] loginWithSession: success')
             return true
         } catch (err) {
-            console.error('[v0] loginWithSession error:', err)
+            console.error('Session login error:', err)
             setError(err.message || 'Failed to login with session string')
             return false
         } finally {
-            console.log('[v0] loginWithSession: finally — setting isLoading false')
             setIsLoading(false)
         }
     }, [getTelegramService])
