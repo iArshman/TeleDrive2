@@ -50,6 +50,64 @@
     font-size: 14px;
 }
 
+/* Login Mode Tabs */
+.login-tabs {
+    display: flex;
+    gap: 0;
+    margin-bottom: var(--spacing-lg);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+.login-tab {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: 13px;
+    font-weight: 500;
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.login-tab:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.login-tab.active {
+    background: var(--accent-primary);
+    color: #fff;
+}
+
+/* Session String Textarea */
+.session-input {
+    width: 100%;
+    font-size: 13px;
+    font-family: monospace;
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    resize: vertical;
+    transition: all var(--transition-fast);
+    line-height: 1.5;
+}
+
+.session-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(53, 132, 228, 0.2);
+}
+
+.session-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 .login-error {
     display: flex;
     align-items: center;

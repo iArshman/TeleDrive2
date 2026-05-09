@@ -167,6 +167,48 @@ export function AuthProvider({ children }) {
         }
     }, [getTelegramService])
 
+    const loginWithSession = useCallback(async (sessionString) => {
+        setError(null)
+        setIsLoading(true)
+
+        try {
+            const service = await getTelegramService()
+            await service.init(sessionString)
+
+            const isAuth = await service.isAuthenticated()
+            if (!isAuth) {
+                throw new Error('Session is invalid or expired. Please check the session string and try again.')
+            }
+
+            const me = await service.getMe()
+            setUser(me)
+            setIsAuthenticated(true)
+            setAuthStep('phone')
+
+            // Persist session so next load auto-logs in
+            await service.saveSession(sessionString)
+
+            if (me) {
+                await service.addAccount({
+                    id: me.id.toString(),
+                    firstName: me.firstName,
+                    lastName: me.lastName,
+                    username: me.username,
+                    phone: me.phone,
+                    session: sessionString,
+                })
+            }
+
+            return true
+        } catch (err) {
+            console.error('Session login error:', err)
+            setError(err.message || 'Failed to login with session string')
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }, [getTelegramService])
+
     const logout = useCallback(async () => {
         setIsLoading(true)
         try {
@@ -233,6 +275,7 @@ export function AuthProvider({ children }) {
         sendCode,
         verifyCode,
         verify2FA,
+        loginWithSession,
         logout,
         switchAccount,
         getAccounts,

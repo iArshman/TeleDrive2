@@ -7,10 +7,12 @@ import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
 function LoginPage() {
-    const { authStep, isLoading, error, sendCode, verifyCode, verify2FA, setError } = useAuth()
+    const { authStep, isLoading, error, sendCode, verifyCode, verify2FA, loginWithSession, setError } = useAuth()
     const [phone, setPhone] = useState('')
     const [code, setCode] = useState('')
     const [password, setPassword] = useState('')
+    const [sessionString, setSessionString] = useState('')
+    const [loginMode, setLoginMode] = useState('phone') // 'phone' | 'session'
 
     const handlePhoneSubmit = async (e) => {
         e.preventDefault()
@@ -28,6 +30,17 @@ function LoginPage() {
         e.preventDefault()
         if (!password) return
         await verify2FA(password)
+    }
+
+    const handleSessionSubmit = async (e) => {
+        e.preventDefault()
+        if (!sessionString.trim()) return
+        await loginWithSession(sessionString.trim())
+    }
+
+    const switchMode = (mode) => {
+        setError(null)
+        setLoginMode(mode)
     }
 
     return (
@@ -52,15 +65,35 @@ function LoginPage() {
                     <p className="login-subtitle">Cloud storage powered by Telegram</p>
                 </div>
 
+                {/* Only show tabs when on the initial phone step (not mid-flow) */}
+                {authStep === 'phone' && (
+                    <div className="login-tabs">
+                        <button
+                            type="button"
+                            className={`login-tab${loginMode === 'phone' ? ' active' : ''}`}
+                            onClick={() => switchMode('phone')}
+                        >
+                            Phone Number
+                        </button>
+                        <button
+                            type="button"
+                            className={`login-tab${loginMode === 'session' ? ' active' : ''}`}
+                            onClick={() => switchMode('session')}
+                        >
+                            Session String
+                        </button>
+                    </div>
+                )}
+
                 {error && (
                     <div className="login-error">
-                        <span className="error-icon">⚠️</span>
+                        <span className="error-icon">⚠</span>
                         <span>{error}</span>
                         <button className="error-close" onClick={() => setError(null)}>×</button>
                     </div>
                 )}
 
-                {authStep === 'phone' && (
+                {authStep === 'phone' && loginMode === 'phone' && (
                     <form onSubmit={handlePhoneSubmit} className="login-form">
                         <div className="form-group">
                             <label htmlFor="phone">Phone Number</label>
@@ -77,6 +110,28 @@ function LoginPage() {
                         </div>
                         <button type="submit" className="btn-primary login-btn" disabled={isLoading || !phone.trim()}>
                             {isLoading ? <span className="spinner"></span> : 'Continue'}
+                        </button>
+                    </form>
+                )}
+
+                {authStep === 'phone' && loginMode === 'session' && (
+                    <form onSubmit={handleSessionSubmit} className="login-form">
+                        <div className="form-group">
+                            <label htmlFor="session">Session String</label>
+                            <textarea
+                                id="session"
+                                className="session-input"
+                                value={sessionString}
+                                onChange={(e) => setSessionString(e.target.value)}
+                                placeholder="Paste your GramJS StringSession here..."
+                                autoFocus
+                                disabled={isLoading}
+                                rows={4}
+                            />
+                            <span className="form-hint">Paste the session string exported from GramJS / TDLib</span>
+                        </div>
+                        <button type="submit" className="btn-primary login-btn" disabled={isLoading || !sessionString.trim()}>
+                            {isLoading ? <span className="spinner"></span> : 'Login with Session'}
                         </button>
                     </form>
                 )}
