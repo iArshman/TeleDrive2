@@ -4,6 +4,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { normaliseSession } from '../lib/telegram'
 
 const AuthContext = createContext(null)
 
@@ -15,6 +16,7 @@ export function AuthProvider({ children }) {
     const [phoneCodeHash, setPhoneCodeHash] = useState(null)
     const [phoneNumber, setPhoneNumber] = useState('')
     const [error, setError] = useState(null)
+    const [hasCredentials, setHasCredentials] = useState(null) // null = unknown, true/false once checked
 
     // Lazy-loaded telegram service reference
     const telegramServiceRef = useRef(null)
@@ -42,36 +44,69 @@ export function AuthProvider({ children }) {
 
         try {
             const service = await getTelegramService()
-            const savedSession = await service.loadSession()
-            await service.init(savedSession)
 
-            if (savedSession) {
-                const isAuth = await service.isAuthenticated()
-                if (isAuth) {
-                    const me = await service.getMe()
+            // Check if credentials are saved
+            const creds = await service.loadCredentials()
+            if (!creds) {
+                setHasCredentials(false)
+                setIsLoading(false)
+                return
+            }
+            setHasCredentials(true)
+
+            const savedSession = await service.loadSession()
+
+            // Only attempt to restore a session if one is actually saved.
+            // Calling init('') with no session would trigger a full MTProto
+            // key-exchange in the browser which hangs indefinitely.
+            if (savedSession && savedSession.length > 10) {
+                await service.init(savedSession)
+                const me = await service.getMe()
+                if (me) {
                     setUser(me)
                     setIsAuthenticated(true)
-
-                    if (me) {
-                        await service.addAccount({
-                            id: me.id.toString(),
-                            firstName: me.firstName,
-                            lastName: me.lastName,
-                            username: me.username,
-                            phone: me.phone,
-                            session: savedSession,
-                        })
-                    }
+                    await service.addAccount({
+                        id: me.id.toString(),
+                        firstName: me.firstName,
+                        lastName: me.lastName,
+                        username: me.username,
+                        phone: me.phone,
+                        session: savedSession,
+                    })
                 }
             }
         } catch (err) {
             console.error('Auth initialization error:', err)
-            // Don't show error to user for initial connection issues
-            // setError('Failed to connect to Telegram')
         } finally {
             setIsLoading(false)
         }
     }
+
+    const saveCredentials = useCallback(async (apiId, apiHash) => {
+        setError(null)
+        setIsLoading(true)
+        try {
+            const service = await getTelegramService()
+            await service.saveCredentials(apiId, apiHash)
+            setHasCredentials(true)
+            return true
+        } catch (err) {
+            setError(err.message || 'Failed to save credentials')
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }, [getTelegramService])
+
+    const clearCredentials = useCallback(async () => {
+        try {
+            const service = await getTelegramService()
+            await service.clearCredentials()
+            setHasCredentials(false)
+        } catch (err) {
+            console.error('Failed to clear credentials:', err)
+        }
+    }, [getTelegramService])
 
     const sendCode = useCallback(async (phone) => {
         setError(null)
@@ -79,6 +114,8 @@ export function AuthProvider({ children }) {
 
         try {
             const service = await getTelegramService()
+            // Build client with empty session (no connect yet); sendCode() will connect
+            await service.init('')
             const result = await service.sendCode(phone)
             setPhoneNumber(phone)
             setPhoneCodeHash(result.phoneCodeHash)
@@ -167,6 +204,50 @@ export function AuthProvider({ children }) {
         }
     }, [getTelegramService])
 
+    const loginWithSession = useCallback(async (rawSession) => {
+        setError(null)
+        setIsLoading(true)
+
+        try {
+            const { session: sessionString, type } = normaliseSession(rawSession)
+
+            const service = await getTelegramService()
+            await service.init(sessionString)
+
+            const me = await service.getMe()
+
+            if (!me) {
+                throw new Error(
+                    type === 'pyrogram'
+                        ? 'Pyrogram session was converted but is expired or invalid. Make sure the API ID and Hash match the ones used to create the session.'
+                        : 'Session is invalid or expired. Please check the session string and try again.'
+                )
+            }
+            setUser(me)
+            setIsAuthenticated(true)
+            setAuthStep('phone')
+
+            await service.saveSession(sessionString)
+
+            await service.addAccount({
+                id: me.id.toString(),
+                firstName: me.firstName,
+                lastName: me.lastName,
+                username: me.username,
+                phone: me.phone,
+                session: sessionString,
+            })
+
+            return true
+        } catch (err) {
+            console.error('Session login error:', err)
+            setError(err.message || 'Failed to login with session string')
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }, [getTelegramService])
+
     const logout = useCallback(async () => {
         setIsLoading(true)
         try {
@@ -230,9 +311,13 @@ export function AuthProvider({ children }) {
         user,
         authStep,
         error,
+        hasCredentials,
+        saveCredentials,
+        clearCredentials,
         sendCode,
         verifyCode,
         verify2FA,
+        loginWithSession,
         logout,
         switchAccount,
         getAccounts,
