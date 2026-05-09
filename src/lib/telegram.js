@@ -9,13 +9,10 @@ import { StringSession } from 'telegram/sessions'
 import { CustomFile } from 'telegram/client/uploads'
 import localforage from 'localforage'
 
-// API Credentials from Telegram App Configuration
-const API_ID = 19527810
-const API_HASH = '247d76d57082a5f89609e5010283a919'
-
-// Session storage key
+// Storage keys
 const SESSION_KEY = 'teledrive_session'
 const ACCOUNTS_KEY = 'teledrive_accounts'
+const CREDENTIALS_KEY = 'teledrive_credentials'
 
 // Create localforage instance for auth data
 const authStorage = localforage.createInstance({
@@ -60,18 +57,75 @@ class TelegramService {
         this.client = null
         this.session = null
         this.currentAccount = null
+        this.apiId = null
+        this.apiHash = null
+    }
+
+    /**
+     * Save API credentials to IndexedDB
+     */
+    async saveCredentials(apiId, apiHash) {
+        try {
+            await authStorage.setItem(CREDENTIALS_KEY, { apiId: Number(apiId), apiHash: String(apiHash) })
+            this.apiId = Number(apiId)
+            this.apiHash = String(apiHash)
+        } catch (e) {
+            console.error('Failed to save credentials:', e)
+        }
+    }
+
+    /**
+     * Load API credentials from IndexedDB
+     */
+    async loadCredentials() {
+        try {
+            const creds = await authStorage.getItem(CREDENTIALS_KEY)
+            if (creds && creds.apiId && creds.apiHash) {
+                this.apiId = creds.apiId
+                this.apiHash = creds.apiHash
+                return creds
+            }
+            return null
+        } catch {
+            return null
+        }
+    }
+
+    /**
+     * Clear saved API credentials
+     */
+    async clearCredentials() {
+        try {
+            await authStorage.removeItem(CREDENTIALS_KEY)
+            this.apiId = null
+            this.apiHash = null
+        } catch (e) {
+            console.error('Failed to clear credentials:', e)
+        }
     }
 
     /**
      * Initialize the Telegram client
      */
-    async init(sessionString = '') {
+    async init(sessionString = '', credentials = null) {
+        // Resolve credentials: argument > instance > stored
+        if (credentials && credentials.apiId && credentials.apiHash) {
+            this.apiId = Number(credentials.apiId)
+            this.apiHash = String(credentials.apiHash)
+        } else if (!this.apiId || !this.apiHash) {
+            await this.loadCredentials()
+        }
+
+        if (!this.apiId || !this.apiHash) {
+            throw new Error('API credentials not set. Please enter your API ID and API Hash.')
+        }
+
         this.session = new StringSession(sessionString)
 
         this.client = new TelegramClient(
             this.session,
-            API_ID,
-            API_HASH,
+            this.apiId,
+            this.apiHash,
             {
                 connectionRetries: 5,
                 useWSS: true,
@@ -112,8 +166,8 @@ class TelegramService {
 
         const result = await this.client.sendCode(
             {
-                apiId: API_ID,
-                apiHash: API_HASH,
+                apiId: this.apiId,
+                apiHash: this.apiHash,
             },
             phoneNumber
         )
@@ -161,8 +215,8 @@ class TelegramService {
 
         const result = await this.client.signInWithPassword(
             {
-                apiId: API_ID,
-                apiHash: API_HASH,
+                apiId: this.apiId,
+                apiHash: this.apiHash,
             },
             {
                 password: async () => password,
@@ -464,4 +518,4 @@ class TelegramService {
 const telegramService = new TelegramService()
 
 export default telegramService
-export { TelegramService, API_ID, API_HASH }
+export { TelegramService }

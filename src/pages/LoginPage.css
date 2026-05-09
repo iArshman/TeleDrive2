@@ -50,6 +50,111 @@
     font-size: 14px;
 }
 
+/* ---- API Credentials Section ---- */
+.creds-section {
+    margin-bottom: var(--spacing-lg);
+}
+
+.creds-header {
+    margin-bottom: var(--spacing-lg);
+}
+
+.creds-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: var(--spacing-xs);
+}
+
+.creds-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.creds-link {
+    color: var(--accent-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.creds-link:hover {
+    color: var(--accent-hover, var(--accent-primary));
+}
+
+.creds-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+}
+
+.creds-actions .login-btn {
+    flex: 1;
+    margin-top: 0;
+}
+
+.btn-ghost {
+    padding: var(--spacing-md) var(--spacing-lg);
+    font-size: 14px;
+    font-weight: 500;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    white-space: nowrap;
+}
+
+.btn-ghost:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.btn-ghost:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Monospace input for API hash */
+.mono-input {
+    font-family: monospace !important;
+    letter-spacing: 0.02em;
+}
+
+/* Edit credentials row */
+.creds-edit-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    margin-top: var(--spacing-lg);
+}
+
+.creds-edit-btn {
+    background: none;
+    border: none;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: var(--radius-sm);
+    transition: color var(--transition-fast);
+}
+
+.creds-edit-btn:hover {
+    color: var(--text-secondary);
+}
+
+.creds-edit-btn.creds-danger:hover {
+    color: var(--error);
+}
+
+.creds-divider {
+    color: var(--text-tertiary);
+    font-size: 12px;
+    user-select: none;
+}
+
 /* Login Mode Tabs */
 .login-tabs {
     display: flex;

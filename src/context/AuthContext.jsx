@@ -15,6 +15,7 @@ export function AuthProvider({ children }) {
     const [phoneCodeHash, setPhoneCodeHash] = useState(null)
     const [phoneNumber, setPhoneNumber] = useState('')
     const [error, setError] = useState(null)
+    const [hasCredentials, setHasCredentials] = useState(null) // null = unknown, true/false once checked
 
     // Lazy-loaded telegram service reference
     const telegramServiceRef = useRef(null)
@@ -42,6 +43,16 @@ export function AuthProvider({ children }) {
 
         try {
             const service = await getTelegramService()
+
+            // Check if credentials are saved
+            const creds = await service.loadCredentials()
+            if (!creds) {
+                setHasCredentials(false)
+                setIsLoading(false)
+                return
+            }
+            setHasCredentials(true)
+
             const savedSession = await service.loadSession()
             await service.init(savedSession)
 
@@ -66,12 +77,36 @@ export function AuthProvider({ children }) {
             }
         } catch (err) {
             console.error('Auth initialization error:', err)
-            // Don't show error to user for initial connection issues
-            // setError('Failed to connect to Telegram')
         } finally {
             setIsLoading(false)
         }
     }
+
+    const saveCredentials = useCallback(async (apiId, apiHash) => {
+        setError(null)
+        setIsLoading(true)
+        try {
+            const service = await getTelegramService()
+            await service.saveCredentials(apiId, apiHash)
+            setHasCredentials(true)
+            return true
+        } catch (err) {
+            setError(err.message || 'Failed to save credentials')
+            return false
+        } finally {
+            setIsLoading(false)
+        }
+    }, [getTelegramService])
+
+    const clearCredentials = useCallback(async () => {
+        try {
+            const service = await getTelegramService()
+            await service.clearCredentials()
+            setHasCredentials(false)
+        } catch (err) {
+            console.error('Failed to clear credentials:', err)
+        }
+    }, [getTelegramService])
 
     const sendCode = useCallback(async (phone) => {
         setError(null)
@@ -272,6 +307,9 @@ export function AuthProvider({ children }) {
         user,
         authStep,
         error,
+        hasCredentials,
+        saveCredentials,
+        clearCredentials,
         sendCode,
         verifyCode,
         verify2FA,
