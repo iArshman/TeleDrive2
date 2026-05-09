@@ -204,15 +204,18 @@ export function AuthProvider({ children }) {
         setIsLoading(true)
 
         try {
-            // Auto-detect Pyrogram vs GramJS and convert if needed
+            console.log('[v0] loginWithSession: normalising session')
             const { session: sessionString, converted, type } = normaliseSession(rawSession)
-
+            console.log('[v0] loginWithSession: type =', type, 'converted =', converted)
 
             const service = await getTelegramService()
+            console.log('[v0] loginWithSession: calling service.init()')
             await service.init(sessionString)
+            console.log('[v0] loginWithSession: init() done, calling getMe()')
 
-            // getMe() is the single source of truth — if it returns null the session is dead
             const me = await service.getMe()
+            console.log('[v0] loginWithSession: getMe() returned', me ? me.id?.toString() : null)
+
             if (!me) {
                 throw new Error(
                     type === 'pyrogram'
@@ -224,26 +227,25 @@ export function AuthProvider({ children }) {
             setIsAuthenticated(true)
             setAuthStep('phone')
 
-            // Always persist the GramJS-format session
             await service.saveSession(sessionString)
 
-            if (me) {
-                await service.addAccount({
-                    id: me.id.toString(),
-                    firstName: me.firstName,
-                    lastName: me.lastName,
-                    username: me.username,
-                    phone: me.phone,
-                    session: sessionString,
-                })
-            }
+            await service.addAccount({
+                id: me.id.toString(),
+                firstName: me.firstName,
+                lastName: me.lastName,
+                username: me.username,
+                phone: me.phone,
+                session: sessionString,
+            })
 
+            console.log('[v0] loginWithSession: success')
             return true
         } catch (err) {
-            console.error('Session login error:', err)
+            console.error('[v0] loginWithSession error:', err)
             setError(err.message || 'Failed to login with session string')
             return false
         } finally {
+            console.log('[v0] loginWithSession: finally — setting isLoading false')
             setIsLoading(false)
         }
     }, [getTelegramService])

@@ -263,14 +263,20 @@ class TelegramService {
             // ignore if logger API not available
         }
 
+        console.log('[v0] TelegramService.init: starting connect(), apiId =', this.apiId, 'sessionLen =', sessionString.length)
+
         // Connect with a timeout so it doesn't hang forever
         await Promise.race([
-            this.client.connect(),
+            this.client.connect().then(() => console.log('[v0] TelegramService.init: connect() resolved')),
             new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Connection timeout. Check your internet connection and try again.')), 15000)
+                setTimeout(() => {
+                    console.log('[v0] TelegramService.init: connect() TIMED OUT after 15s')
+                    reject(new Error('Connection timeout. Check your internet connection and try again.'))
+                }, 15000)
             )
         ])
 
+        console.log('[v0] TelegramService.init: done')
         return this.client
     }
 
@@ -369,8 +375,12 @@ class TelegramService {
     async getMe() {
         if (!this.client) return null
         try {
-            return await this.client.getMe()
-        } catch {
+            console.log('[v0] getMe: calling client.getMe()')
+            const me = await this.client.getMe()
+            console.log('[v0] getMe: returned', me ? me.id?.toString() : null)
+            return me
+        } catch (err) {
+            console.error('[v0] getMe: error', err)
             return null
         }
     }
