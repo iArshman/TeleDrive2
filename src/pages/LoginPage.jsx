@@ -220,12 +220,14 @@ function LoginPage() {
                                         className="session-input"
                                         value={sessionString}
                                         onChange={(e) => setSessionString(e.target.value)}
-                                        placeholder="Paste your GramJS StringSession here..."
+                                        placeholder="Paste your GramJS StringSession or Pyrogram export_session_string() here..."
                                         autoFocus
                                         disabled={isLoading}
                                         rows={4}
                                     />
-                                    <span className="form-hint">Paste the session string exported from GramJS / TDLib</span>
+                                    <span className="form-hint">
+                                        Accepts <strong>GramJS</strong> StringSession and <strong>Pyrogram</strong> export_session_string() — format is auto-detected and converted
+                                    </span>
                                 </div>
                                 <button type="submit" className="btn-primary login-btn" disabled={isLoading || !sessionString.trim()}>
                                     {isLoading ? <span className="spinner"></span> : 'Login with Session'}

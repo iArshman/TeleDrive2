@@ -4,6 +4,7 @@
  */
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { normaliseSession } from '../lib/telegram'
 
 const AuthContext = createContext(null)
 
@@ -202,17 +203,25 @@ export function AuthProvider({ children }) {
         }
     }, [getTelegramService])
 
-    const loginWithSession = useCallback(async (sessionString) => {
+    const loginWithSession = useCallback(async (rawSession) => {
         setError(null)
         setIsLoading(true)
 
         try {
+            // Auto-detect Pyrogram vs GramJS and convert if needed
+            const { session: sessionString, converted, type } = normaliseSession(rawSession)
+
+
             const service = await getTelegramService()
             await service.init(sessionString)
 
             const isAuth = await service.isAuthenticated()
             if (!isAuth) {
-                throw new Error('Session is invalid or expired. Please check the session string and try again.')
+                throw new Error(
+                    type === 'pyrogram'
+                        ? 'Pyrogram session converted but authentication failed. Make sure the API ID and Hash match the ones used to create the session.'
+                        : 'Session is invalid or expired. Please check the session string and try again.'
+                )
             }
 
             const me = await service.getMe()
@@ -220,7 +229,7 @@ export function AuthProvider({ children }) {
             setIsAuthenticated(true)
             setAuthStep('phone')
 
-            // Persist session so next load auto-logs in
+            // Always persist the GramJS-format session
             await service.saveSession(sessionString)
 
             if (me) {
