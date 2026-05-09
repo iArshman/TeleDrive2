@@ -7,8 +7,8 @@ import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
-// Bot username - set this in your environment
-const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || ''
+// Bot username
+const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'tdrivex2_bot'
 
 function LoginPage() {
     const { isLoading, error, login, setError } = useAuth()
