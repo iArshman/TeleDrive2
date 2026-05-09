@@ -1,80 +1,50 @@
 /**
  * TeleDrive - Login Page
+ * Uses Telegram Login Widget for authentication
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import './LoginPage.css'
 
+// Bot username for Telegram Login Widget - set this in your .env
+const BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || 'YourBotUsername'
+
 function LoginPage() {
-    const {
-        authStep, isLoading, error,
-        hasCredentials, saveCredentials, clearCredentials,
-        sendCode, verifyCode, verify2FA, loginWithSession,
-        setError,
-    } = useAuth()
+    const { isLoading, error, loginWithTelegram, setError } = useAuth()
+    const [widgetLoaded, setWidgetLoaded] = useState(false)
+    const widgetRef = useRef(null)
 
-    const [phone, setPhone] = useState('')
-    const [code, setCode] = useState('')
-    const [password, setPassword] = useState('')
-    const [sessionString, setSessionString] = useState('')
-    const [loginMode, setLoginMode] = useState('phone') // 'phone' | 'session'
-
-    // API credentials entry state
-    const [apiId, setApiId] = useState('')
-    const [apiHash, setApiHash] = useState('')
-    const [editingCreds, setEditingCreds] = useState(false)
-
-    // ---- Handlers ----
-
-    const handleCredentialsSubmit = async (e) => {
-        e.preventDefault()
-        if (!apiId.trim() || !apiHash.trim()) return
-        const ok = await saveCredentials(apiId.trim(), apiHash.trim())
-        if (ok) {
-            setApiId('')
-            setApiHash('')
-            setEditingCreds(false)
+    // Load Telegram Login Widget script
+    useEffect(() => {
+        // Create callback function for Telegram
+        window.onTelegramAuth = async (user) => {
+            // user contains: id, first_name, last_name, username, photo_url, auth_date, hash
+            await loginWithTelegram(user)
         }
-    }
 
-    const handleClearCredentials = async () => {
-        await clearCredentials()
-        setEditingCreds(false)
-        setError(null)
-    }
+        // Load the widget script
+        const script = document.createElement('script')
+        script.src = 'https://telegram.org/js/telegram-widget.js?22'
+        script.async = true
+        script.setAttribute('data-telegram-login', BOT_USERNAME)
+        script.setAttribute('data-size', 'large')
+        script.setAttribute('data-radius', '8')
+        script.setAttribute('data-onauth', 'onTelegramAuth(user)')
+        script.setAttribute('data-request-access', 'write')
 
-    const handlePhoneSubmit = async (e) => {
-        e.preventDefault()
-        if (!phone.trim()) return
-        await sendCode(phone.trim())
-    }
+        script.onload = () => setWidgetLoaded(true)
+        script.onerror = () => setError('Failed to load Telegram login widget')
 
-    const handleCodeSubmit = async (e) => {
-        e.preventDefault()
-        if (!code.trim()) return
-        await verifyCode(code.trim())
-    }
+        if (widgetRef.current) {
+            widgetRef.current.innerHTML = ''
+            widgetRef.current.appendChild(script)
+        }
 
-    const handle2FASubmit = async (e) => {
-        e.preventDefault()
-        if (!password) return
-        await verify2FA(password)
-    }
-
-    const handleSessionSubmit = async (e) => {
-        e.preventDefault()
-        if (!sessionString.trim()) return
-        await loginWithSession(sessionString.trim())
-    }
-
-    const switchMode = (mode) => {
-        setError(null)
-        setLoginMode(mode)
-    }
-
-    // ---- Credentials form (shown when no creds saved OR user clicks edit) ----
-    const showCredentialsForm = hasCredentials === false || editingCreds
+        return () => {
+            delete window.onTelegramAuth
+        }
+    }, [loginWithTelegram, setError])
 
     return (
         <div className="login-page">
@@ -106,204 +76,54 @@ function LoginPage() {
                     </div>
                 )}
 
-                {/* ---- Step 1: API Credentials ---- */}
-                {showCredentialsForm && (
-                    <div className="creds-section">
-                        <div className="creds-header">
-                            <h2 className="creds-title">API Credentials</h2>
-                            <p className="creds-desc">
-                                Get your API ID and Hash from{' '}
-                                <a href="https://my.telegram.org/apps" target="_blank" rel="noreferrer" className="creds-link">
-                                    my.telegram.org/apps
-                                </a>
-                            </p>
-                        </div>
-                        <form onSubmit={handleCredentialsSubmit} className="login-form">
-                            <div className="form-group">
-                                <label htmlFor="apiId">API ID</label>
-                                <input
-                                    id="apiId"
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={apiId}
-                                    onChange={(e) => setApiId(e.target.value)}
-                                    placeholder="12345678"
-                                    autoFocus
-                                    disabled={isLoading}
-                                />
+                <div className="telegram-login-section">
+                    <p className="login-instruction">
+                        Click the button below to login with your Telegram account
+                    </p>
+
+                    {/* Telegram Login Widget container */}
+                    <div className="telegram-widget-wrapper">
+                        {isLoading && (
+                            <div className="widget-loading">
+                                <span className="spinner"></span>
+                                <span>Authenticating...</span>
                             </div>
-                            <div className="form-group">
-                                <label htmlFor="apiHash">API Hash</label>
-                                <input
-                                    id="apiHash"
-                                    type="text"
-                                    value={apiHash}
-                                    onChange={(e) => setApiHash(e.target.value)}
-                                    placeholder="0123456789abcdef0123456789abcdef"
-                                    disabled={isLoading}
-                                    className="mono-input"
-                                />
+                        )}
+
+                        {!isLoading && (
+                            <div
+                                ref={widgetRef}
+                                className="telegram-widget"
+                            />
+                        )}
+
+                        {!widgetLoaded && !isLoading && (
+                            <div className="widget-placeholder">
+                                <span className="spinner"></span>
+                                <span>Loading Telegram Login...</span>
                             </div>
-                            <div className="creds-actions">
-                                <button
-                                    type="submit"
-                                    className="btn-primary login-btn"
-                                    disabled={isLoading || !apiId.trim() || !apiHash.trim()}
-                                >
-                                    {isLoading ? <span className="spinner"></span> : 'Save Credentials'}
-                                </button>
-                                {editingCreds && (
-                                    <button
-                                        type="button"
-                                        className="btn-ghost"
-                                        onClick={() => { setEditingCreds(false); setError(null) }}
-                                        disabled={isLoading}
-                                    >
-                                        Cancel
-                                    </button>
-                                )}
-                            </div>
-                        </form>
+                        )}
                     </div>
-                )}
 
-                {/* ---- Step 2: Auth (phone or session) — only shown when creds are saved ---- */}
-                {hasCredentials && !editingCreds && (
-                    <>
-                        {/* Tabs — only on initial phone step */}
-                        {authStep === 'phone' && (
-                            <div className="login-tabs">
-                                <button
-                                    type="button"
-                                    className={`login-tab${loginMode === 'phone' ? ' active' : ''}`}
-                                    onClick={() => switchMode('phone')}
-                                >
-                                    Phone Number
-                                </button>
-                                <button
-                                    type="button"
-                                    className={`login-tab${loginMode === 'session' ? ' active' : ''}`}
-                                    onClick={() => switchMode('session')}
-                                >
-                                    Session String
-                                </button>
-                            </div>
-                        )}
-
-                        {authStep === 'phone' && loginMode === 'phone' && (
-                            <form onSubmit={handlePhoneSubmit} className="login-form">
-                                <div className="form-group">
-                                    <label htmlFor="phone">Phone Number</label>
-                                    <input
-                                        id="phone"
-                                        type="tel"
-                                        value={phone}
-                                        onChange={(e) => setPhone(e.target.value)}
-                                        placeholder="+1234567890"
-                                        autoFocus
-                                        disabled={isLoading}
-                                    />
-                                    <span className="form-hint">Include country code</span>
-                                </div>
-                                <button type="submit" className="btn-primary login-btn" disabled={isLoading || !phone.trim()}>
-                                    {isLoading ? <span className="spinner"></span> : 'Continue'}
-                                </button>
-                            </form>
-                        )}
-
-                        {authStep === 'phone' && loginMode === 'session' && (
-                            <form onSubmit={handleSessionSubmit} className="login-form">
-                                <div className="form-group">
-                                    <label htmlFor="session">Session String</label>
-                                    <textarea
-                                        id="session"
-                                        className="session-input"
-                                        value={sessionString}
-                                        onChange={(e) => setSessionString(e.target.value)}
-                                        placeholder="Paste your GramJS StringSession or Pyrogram export_session_string() here..."
-                                        autoFocus
-                                        disabled={isLoading}
-                                        rows={4}
-                                    />
-                                    <span className="form-hint">
-                                        Accepts <strong>GramJS</strong> StringSession and <strong>Pyrogram</strong> export_session_string() — format is auto-detected and converted
-                                    </span>
-                                </div>
-                                <button type="submit" className="btn-primary login-btn" disabled={isLoading || !sessionString.trim()}>
-                                    {isLoading ? <span className="spinner"></span> : 'Login with Session'}
-                                </button>
-                            </form>
-                        )}
-
-                        {authStep === 'code' && (
-                            <form onSubmit={handleCodeSubmit} className="login-form">
-                                <div className="form-group">
-                                    <label htmlFor="code">Verification Code</label>
-                                    <input
-                                        id="code"
-                                        type="text"
-                                        value={code}
-                                        onChange={(e) => setCode(e.target.value)}
-                                        placeholder="12345"
-                                        autoFocus
-                                        disabled={isLoading}
-                                        maxLength={6}
-                                    />
-                                    <span className="form-hint">Enter the code sent to your Telegram</span>
-                                </div>
-                                <button type="submit" className="btn-primary login-btn" disabled={isLoading || !code.trim()}>
-                                    {isLoading ? <span className="spinner"></span> : 'Verify'}
-                                </button>
-                            </form>
-                        )}
-
-                        {authStep === '2fa' && (
-                            <form onSubmit={handle2FASubmit} className="login-form">
-                                <div className="form-group">
-                                    <label htmlFor="password">Two-Factor Password</label>
-                                    <input
-                                        id="password"
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Enter your 2FA password"
-                                        autoFocus
-                                        disabled={isLoading}
-                                    />
-                                    <span className="form-hint">Your Telegram cloud password</span>
-                                </div>
-                                <button type="submit" className="btn-primary login-btn" disabled={isLoading || !password}>
-                                    {isLoading ? <span className="spinner"></span> : 'Login'}
-                                </button>
-                            </form>
-                        )}
-
-                        {/* Edit / clear credentials link */}
-                        {authStep === 'phone' && (
-                            <div className="creds-edit-row">
-                                <button
-                                    type="button"
-                                    className="creds-edit-btn"
-                                    onClick={() => { setEditingCreds(true); setError(null) }}
-                                >
-                                    Edit API credentials
-                                </button>
-                                <span className="creds-divider">·</span>
-                                <button
-                                    type="button"
-                                    className="creds-edit-btn creds-danger"
-                                    onClick={handleClearCredentials}
-                                >
-                                    Clear &amp; reset
-                                </button>
-                            </div>
-                        )}
-                    </>
-                )}
+                    <div className="login-features">
+                        <div className="feature">
+                            <span className="feature-icon">&#128274;</span>
+                            <span>Secure OAuth login</span>
+                        </div>
+                        <div className="feature">
+                            <span className="feature-icon">&#128247;</span>
+                            <span>No password required</span>
+                        </div>
+                        <div className="feature">
+                            <span className="feature-icon">&#9889;</span>
+                            <span>Instant access</span>
+                        </div>
+                    </div>
+                </div>
 
                 <div className="login-footer">
-                    <p>Your files are stored in your Telegram account</p>
-                    <p className="security-note">End-to-end encrypted</p>
+                    <p>Your files are stored securely via Telegram Bot</p>
+                    <p className="security-note">Powered by Telegram Bot API</p>
                 </div>
             </div>
         </div>

@@ -1,25 +1,25 @@
 /**
  * TeleDrive - File System Context
- * Manages virtual file system state
+ * Manages virtual file system state using Bot API
  */
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
-import { getFileInfo, createMetadata, updateMetadata, getFilesInPath, buildFolderTree } from '../lib/virtualFS'
 
-// Lazy load telegram service
-let telegramServiceInstance = null
-const getTelegramService = async () => {
-    if (!telegramServiceInstance) {
-        const module = await import('../lib/telegram')
-        telegramServiceInstance = module.default
+// Lazy load bot service
+let botServiceInstance = null
+const getBotService = async () => {
+    if (!botServiceInstance) {
+        const module = await import('../lib/telegramBot')
+        botServiceInstance = module.default
     }
-    return telegramServiceInstance
+    return botServiceInstance
 }
 
 const FileSystemContext = createContext(null)
 
 export function FileSystemProvider({ children }) {
     const [files, setFiles] = useState([])
+    const [folders, setFolders] = useState([])
     const [currentPath, setCurrentPath] = useState('/')
     const [selectedFiles, setSelectedFiles] = useState([])
     const [isLoading, setIsLoading] = useState(true)
@@ -38,7 +38,7 @@ export function FileSystemProvider({ children }) {
         loadFiles()
     }, [])
 
-    // Load all files from Saved Messages
+    // Load all files from local index
     const loadFiles = useCallback(async () => {
         if (loadingRef.current) return
         loadingRef.current = true
@@ -46,15 +46,14 @@ export function FileSystemProvider({ children }) {
         setError(null)
 
         try {
-            const telegramService = await getTelegramService()
-            const messages = await telegramService.getSavedMessages(500)
-
-            const fileList = messages
-                .map(msg => getFileInfo(msg))
-                .filter(f => f !== null)
-                .filter(f => f.isManaged === true)
+            const botService = await getBotService()
+            const [fileList, folderList] = await Promise.all([
+                botService.getFiles(),
+                botService.getFolders(),
+            ])
 
             setFiles(fileList)
+            setFolders(folderList)
         } catch (err) {
             console.error('Load files error:', err)
             setError('Failed to load files')
@@ -64,23 +63,22 @@ export function FileSystemProvider({ children }) {
         }
     }, [])
 
-    // Get files for current path
+    // Get files and folders for current path
     const currentFiles = useCallback(() => {
-        let result = getFilesInPath(files, currentPath)
+        // Combine files and folders
+        const filesInPath = files.filter(f => f.path === currentPath)
+        const foldersInPath = folders.filter(f => f.path === currentPath)
+
+        let result = [
+            ...foldersInPath.map(f => ({ ...f, type: 'folder' })),
+            ...filesInPath,
+        ]
 
         // Apply search filter
         if (searchQuery) {
             const query = searchQuery.toLowerCase()
             result = result.filter(f =>
-                f.name.toLowerCase().includes(query) ||
-                f.tags?.some(t => t.toLowerCase().includes(query))
-            )
-        }
-
-        // Apply tag filter
-        if (filterTags.length > 0) {
-            result = result.filter(f =>
-                filterTags.every(tag => f.tags?.includes(tag))
+                f.name.toLowerCase().includes(query)
             )
         }
 
@@ -96,13 +94,13 @@ export function FileSystemProvider({ children }) {
                     compare = a.name.localeCompare(b.name)
                     break
                 case 'date':
-                    compare = new Date(a.modifiedAt) - new Date(b.modifiedAt)
+                    compare = (a.uploadedAt || a.createdAt || 0) - (b.uploadedAt || b.createdAt || 0)
                     break
                 case 'size':
-                    compare = a.size - b.size
+                    compare = (a.size || 0) - (b.size || 0)
                     break
                 case 'type':
-                    compare = a.fileType.localeCompare(b.fileType)
+                    compare = (a.mimeType || '').localeCompare(b.mimeType || '')
                     break
                 default:
                     compare = 0
@@ -112,12 +110,23 @@ export function FileSystemProvider({ children }) {
         })
 
         return result
-    }, [files, currentPath, searchQuery, filterTags, sortBy, sortOrder])
+    }, [files, folders, currentPath, searchQuery, sortBy, sortOrder])
 
     // Get folder tree
     const folderTree = useCallback(() => {
-        return buildFolderTree(files)
-    }, [files])
+        const tree = [{ name: 'Home', path: '/', children: [] }]
+
+        folders.forEach(folder => {
+            // Simple flat list for now
+            tree[0].children.push({
+                name: folder.name,
+                path: folder.path + folder.name + '/',
+                children: [],
+            })
+        })
+
+        return tree
+    }, [folders])
 
     // Navigate to path
     const navigateTo = useCallback((path) => {
@@ -152,14 +161,8 @@ export function FileSystemProvider({ children }) {
     const createFolder = useCallback(async (name) => {
         setError(null)
         try {
-            const telegramService = await getTelegramService()
-            const metadata = createMetadata({
-                path: currentPath,
-                name,
-                type: 'folder',
-            })
-
-            await telegramService.sendMessage(metadata)
+            const botService = await getBotService()
+            await botService.createFolder(name, currentPath)
             await loadFiles()
             return true
         } catch (err) {
@@ -169,213 +172,77 @@ export function FileSystemProvider({ children }) {
         }
     }, [currentPath, loadFiles])
 
-    // Upload file with retry mechanism
+    // Upload file
     const uploadFile = useCallback(async (file, options = {}) => {
-        const maxRetries = options.maxRetries ?? 3
         const uploadId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9)
 
         setUploadProgress(prev => ({
             ...prev,
-            [uploadId]: { name: file.name, progress: 0, status: 'uploading', retries: 0 }
+            [uploadId]: { name: file.name, progress: 0, status: 'uploading' }
         }))
-
-        let lastError = null
-
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                // Update retry count in progress
-                if (attempt > 0) {
-                    setUploadProgress(prev => ({
-                        ...prev,
-                        [uploadId]: { ...prev[uploadId], retries: attempt, status: 'retrying' }
-                    }))
-                    // Exponential backoff: 1s, 2s, 4s...
-                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt - 1) * 1000))
-                }
-
-                const telegramService = await getTelegramService()
-
-                // Generate UUID filename while keeping original extension
-                const extension = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
-                const uuid = crypto.randomUUID()
-                const uniqueName = uuid + extension
-
-                const metadata = createMetadata({
-                    path: currentPath,
-                    name: uniqueName,
-                    type: 'file',
-                    tags: options.tags || [],
-                    encrypted: options.encrypted || false,
-                    originalName: file.name, // Store original name in metadata
-                })
-
-                const progressCallback = (progress) => {
-                    const percent = Math.round(progress * 100)
-                    setUploadProgress(prev => ({
-                        ...prev,
-                        [uploadId]: { ...prev[uploadId], progress: percent, status: 'uploading' }
-                    }))
-                }
-
-                // Determine if it's a photo
-                const isPhoto = file.type.startsWith('image/') && !options.forceDocument
-
-                if (isPhoto) {
-                    await telegramService.sendPhoto(file, metadata, progressCallback)
-                } else {
-                    await telegramService.sendFile(file, metadata, progressCallback)
-                }
-
-                setUploadProgress(prev => ({
-                    ...prev,
-                    [uploadId]: { ...prev[uploadId], progress: 100, status: 'complete' }
-                }))
-
-                // Remove from progress after delay
-                setTimeout(() => {
-                    setUploadProgress(prev => {
-                        const { [uploadId]: _, ...rest } = prev
-                        return rest
-                    })
-                }, 2000)
-
-                await loadFiles()
-                return true
-
-            } catch (err) {
-                lastError = err
-                console.warn(`Upload attempt ${attempt + 1}/${maxRetries + 1} failed for ${file.name}:`, err.message)
-
-                // Don't retry on certain errors
-                if (err.message?.includes('Client not initialized') ||
-                    err.message?.includes('not authenticated')) {
-                    break
-                }
-            }
-        }
-
-        // All retries failed
-        console.error(`Upload failed for ${file.name} after ${maxRetries + 1} attempts:`, lastError)
-        setUploadProgress(prev => ({
-            ...prev,
-            [uploadId]: { ...prev[uploadId], status: 'error', error: lastError?.message || 'Upload failed' }
-        }))
-
-        // Remove error status after longer delay
-        setTimeout(() => {
-            setUploadProgress(prev => {
-                const { [uploadId]: _, ...rest } = prev
-                return rest
-            })
-        }, 5000)
-
-        setError(`Failed to upload: ${file.name}`)
-        return false
-    }, [currentPath, loadFiles])
-
-    // Rename file/folder
-    const renameItem = useCallback(async (fileId, newName) => {
-        const file = files.find(f => f.id === fileId)
-        if (!file) return false
 
         try {
-            const telegramService = await getTelegramService()
+            const botService = await getBotService()
 
-            // Rename the item itself
-            if (file.isManaged) {
-                const newCaption = updateMetadata(file.message, { name: newName })
-                await telegramService.editMessageCaption(file.messageId, newCaption)
-            } else {
-                // Convert to managed file
-                const metadata = createMetadata({
-                    path: file.path,
-                    name: newName,
-                    type: file.type,
-                    displayText: file.displayText,
+            setUploadProgress(prev => ({
+                ...prev,
+                [uploadId]: { ...prev[uploadId], progress: 50, status: 'uploading' }
+            }))
+
+            await botService.uploadFile(file, currentPath)
+
+            setUploadProgress(prev => ({
+                ...prev,
+                [uploadId]: { ...prev[uploadId], progress: 100, status: 'complete' }
+            }))
+
+            // Remove from progress after delay
+            setTimeout(() => {
+                setUploadProgress(prev => {
+                    const { [uploadId]: _, ...rest } = prev
+                    return rest
                 })
-                await telegramService.editMessageCaption(file.messageId, metadata)
-            }
+            }, 2000)
 
-            // If it's a folder, update paths of all files inside it
-            if (file.type === 'folder') {
-                const oldPath = file.path + file.name + '/'
-                const newPath = file.path + newName + '/'
+            await loadFiles()
+            return true
 
-                // Find all files that have paths starting with the old folder path
-                const childFiles = files.filter(f =>
-                    f.id !== fileId && f.path.startsWith(oldPath)
-                )
+        } catch (err) {
+            console.error('Upload error:', err)
+            setUploadProgress(prev => ({
+                ...prev,
+                [uploadId]: { ...prev[uploadId], status: 'error', error: err.message }
+            }))
 
-                // Update each child file's path
-                for (const childFile of childFiles) {
-                    const updatedPath = childFile.path.replace(oldPath, newPath)
-                    if (childFile.isManaged) {
-                        const childCaption = updateMetadata(childFile.message, { path: updatedPath })
-                        await telegramService.editMessageCaption(childFile.messageId, childCaption)
+            setTimeout(() => {
+                setUploadProgress(prev => {
+                    const { [uploadId]: _, ...rest } = prev
+                    return rest
+                })
+            }, 5000)
+
+            setError(`Failed to upload: ${file.name}`)
+            return false
+        }
+    }, [currentPath, loadFiles])
+
+    // Delete items
+    const deleteItems = useCallback(async (fileIds) => {
+        try {
+            const botService = await getBotService()
+
+            for (const id of fileIds) {
+                const file = files.find(f => f.fileId === id || f.id === id)
+                if (file) {
+                    if (file.isFolder || file.type === 'folder') {
+                        await botService.deleteFolder(file.id)
                     } else {
-                        const childMetadata = createMetadata({
-                            path: updatedPath,
-                            name: childFile.name,
-                            type: childFile.type,
-                            displayText: childFile.displayText,
-                        })
-                        await telegramService.editMessageCaption(childFile.messageId, childMetadata)
+                        await botService.deleteFile(file.fileId, file.id)
                     }
                 }
             }
 
             await loadFiles()
-            return true
-        } catch (err) {
-            console.error('Rename error:', err)
-            setError('Failed to rename')
-            return false
-        }
-    }, [files, loadFiles])
-
-    // Move item to new path
-    const moveItem = useCallback(async (fileId, newPath) => {
-        const file = files.find(f => f.id === fileId)
-        if (!file) return false
-
-        try {
-            const telegramService = await getTelegramService()
-            if (file.isManaged) {
-                const newCaption = updateMetadata(file.message, { path: newPath })
-                await telegramService.editMessageCaption(file.messageId, newCaption)
-            } else {
-                const metadata = createMetadata({
-                    path: newPath,
-                    name: file.name,
-                    type: file.type,
-                    displayText: file.displayText,
-                })
-                await telegramService.editMessageCaption(file.messageId, metadata)
-            }
-
-            await loadFiles()
-            return true
-        } catch (err) {
-            console.error('Move error:', err)
-            setError('Failed to move')
-            return false
-        }
-    }, [files, loadFiles])
-
-    // Delete items
-    const deleteItems = useCallback(async (fileIds) => {
-        try {
-            const telegramService = await getTelegramService()
-            const messageIds = fileIds.map(id => {
-                const file = files.find(f => f.id === id)
-                return file?.messageId
-            }).filter(Boolean)
-
-            if (messageIds.length > 0) {
-                await telegramService.deleteMessages(messageIds)
-                await loadFiles()
-            }
-
             setSelectedFiles([])
             return true
         } catch (err) {
@@ -385,59 +252,20 @@ export function FileSystemProvider({ children }) {
         }
     }, [files, loadFiles])
 
-    // Update tags
-    const updateTags = useCallback(async (fileId, tags) => {
-        const file = files.find(f => f.id === fileId)
-        if (!file) return false
-
-        try {
-            const telegramService = await getTelegramService()
-            if (file.isManaged) {
-                const newCaption = updateMetadata(file.message, { tags })
-                await telegramService.editMessageCaption(file.messageId, newCaption)
-            } else {
-                const metadata = createMetadata({
-                    path: file.path,
-                    name: file.name,
-                    type: file.type,
-                    tags,
-                    displayText: file.displayText,
-                })
-                await telegramService.editMessageCaption(file.messageId, metadata)
-            }
-
-            await loadFiles()
-            return true
-        } catch (err) {
-            console.error('Update tags error:', err)
-            setError('Failed to update tags')
-            return false
-        }
-    }, [files, loadFiles])
-
     // Download file
-    const downloadFile = useCallback(async (fileId, progressCallback) => {
-        const file = files.find(f => f.id === fileId)
-        if (!file || !file.media) return null
+    const downloadFile = useCallback(async (fileId) => {
+        const file = files.find(f => f.fileId === fileId)
+        if (!file) return null
 
         try {
-            const telegramService = await getTelegramService()
-            const buffer = await telegramService.downloadMedia(file.message, progressCallback)
-            return buffer
+            const botService = await getBotService()
+            const blob = await botService.downloadFile(fileId)
+            return blob
         } catch (err) {
             console.error('Download error:', err)
             setError('Failed to download')
             return null
         }
-    }, [files])
-
-    // Get all unique tags
-    const getAllTags = useCallback(() => {
-        const tagSet = new Set()
-        files.forEach(f => {
-            f.tags?.forEach(t => tagSet.add(t))
-        })
-        return Array.from(tagSet).sort()
     }, [files])
 
     // Selection handlers
@@ -455,12 +283,30 @@ export function FileSystemProvider({ children }) {
 
     const selectAll = useCallback(() => {
         const current = currentFiles()
-        setSelectedFiles(current.map(f => f.id))
+        setSelectedFiles(current.map(f => f.fileId || f.id))
     }, [currentFiles])
 
     const clearSelection = useCallback(() => {
         setSelectedFiles([])
     }, [])
+
+    // Placeholder functions for compatibility
+    const renameItem = useCallback(async () => {
+        setError('Rename not available with Bot API')
+        return false
+    }, [])
+
+    const moveItem = useCallback(async () => {
+        setError('Move not available with Bot API')
+        return false
+    }, [])
+
+    const updateTags = useCallback(async () => {
+        setError('Tags not available with Bot API')
+        return false
+    }, [])
+
+    const getAllTags = useCallback(() => [], [])
 
     const value = {
         files,
