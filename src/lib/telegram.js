@@ -235,6 +235,12 @@ class TelegramService {
             throw new Error('API credentials not set. Please enter your API ID and API Hash.')
         }
 
+        // Disconnect existing client before replacing it
+        if (this.client) {
+            try { await this.client.disconnect() } catch { /* ignore */ }
+            this.client = null
+        }
+
         this.session = new StringSession(sessionString)
 
         this.client = new TelegramClient(
@@ -242,8 +248,9 @@ class TelegramService {
             this.apiId,
             this.apiHash,
             {
-                connectionRetries: 5,
+                connectionRetries: 3,
                 useWSS: true,
+                retryDelay: 1000,
             }
         )
 
@@ -256,18 +263,26 @@ class TelegramService {
             // ignore if logger API not available
         }
 
-        await this.client.connect()
+        // Connect with a timeout so it doesn't hang forever
+        await Promise.race([
+            this.client.connect(),
+            new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Connection timeout. Check your internet connection and try again.')), 15000)
+            )
+        ])
+
         return this.client
     }
 
     /**
-     * Check if user is authenticated
+     * Check if user is authenticated.
+     * Uses checkAuthorization which is lighter than getMe() and doesn't stall.
      */
     async isAuthenticated() {
         if (!this.client) return false
         try {
-            const me = await this.client.getMe()
-            return !!me
+            // client.isUserAuthorized() is synchronous in GramJS — checks local session state
+            return await this.client.isUserAuthorized()
         } catch {
             return false
         }

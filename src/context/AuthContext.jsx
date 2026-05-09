@@ -58,22 +58,18 @@ export function AuthProvider({ children }) {
             await service.init(savedSession)
 
             if (savedSession) {
-                const isAuth = await service.isAuthenticated()
-                if (isAuth) {
-                    const me = await service.getMe()
+                const me = await service.getMe()
+                if (me) {
                     setUser(me)
                     setIsAuthenticated(true)
-
-                    if (me) {
-                        await service.addAccount({
-                            id: me.id.toString(),
-                            firstName: me.firstName,
-                            lastName: me.lastName,
-                            username: me.username,
-                            phone: me.phone,
-                            session: savedSession,
-                        })
-                    }
+                    await service.addAccount({
+                        id: me.id.toString(),
+                        firstName: me.firstName,
+                        lastName: me.lastName,
+                        username: me.username,
+                        phone: me.phone,
+                        session: savedSession,
+                    })
                 }
             }
         } catch (err) {
@@ -215,16 +211,15 @@ export function AuthProvider({ children }) {
             const service = await getTelegramService()
             await service.init(sessionString)
 
-            const isAuth = await service.isAuthenticated()
-            if (!isAuth) {
+            // getMe() is the single source of truth — if it returns null the session is dead
+            const me = await service.getMe()
+            if (!me) {
                 throw new Error(
                     type === 'pyrogram'
-                        ? 'Pyrogram session converted but authentication failed. Make sure the API ID and Hash match the ones used to create the session.'
+                        ? 'Pyrogram session was converted but is expired or invalid. Make sure the API ID and Hash match the ones used to create the session.'
                         : 'Session is invalid or expired. Please check the session string and try again.'
                 )
             }
-
-            const me = await service.getMe()
             setUser(me)
             setIsAuthenticated(true)
             setAuthStep('phone')
